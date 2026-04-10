@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>屏幕录制</title>
-    <script src="./lib/ffmpeg.min.js"></script>
     <style>
         :root { --primary: #007aff; --danger: #d93025; --success: #28a745; --bg: #f5f7f9; }
         body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); padding: 20px; display: flex; justify-content: center; }
@@ -93,9 +92,13 @@
 
 <script type="module">
     import { Muxer, ArrayBufferTarget, StreamTarget } from './lib/mp4-muxer.js';
-    const { createFFmpeg, fetchFile } = FFmpeg;
-
-    const ffmpeg = createFFmpeg({ log: false, corePath: new URL('./lib/ffmpeg-core.js', document.location).href });
+    const ffmpegHost = window.parent;
+    if (!ffmpegHost || ffmpegHost === window || !ffmpegHost.SharedFFmpeg || !ffmpegHost.FFmpeg) {
+        document.body.innerHTML = '<div style="padding:24px;font-family:sans-serif">请从 index.html 打开此页面。</div>';
+        throw new Error('请从 index.html 进入此页面');
+    }
+    const { fetchFile } = ffmpegHost.FFmpeg;
+    const ffmpeg = ffmpegHost.SharedFFmpeg.getOrCreate(ffmpegHost.__sharedFFmpegConfig);
     const el = {
         preview: document.getElementById('preview'),
         status: document.getElementById('status-msg'),
@@ -118,7 +121,7 @@
 
     (async () => {
         try {
-            await ffmpeg.load();
+            await ffmpegHost.SharedFFmpeg.load(ffmpegHost.__sharedFFmpegConfig);
             el.status.innerText = "✅ FFmpeg 引擎已就绪";
         } catch (e) { el.status.innerText = "❌ 加载失败，请检查跨域隔离配置。"; }
     })();

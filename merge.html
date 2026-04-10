@@ -4,7 +4,6 @@
 <head>
     <meta charset="UTF-8">
     <title>视频合并与截取</title>
-    <script src="./lib/ffmpeg.min.js"></script>
     <style>
         body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; display: flex; justify-content: center; }
         .card { background: white; padding: 2rem; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); width: 100%; max-width: 800px; }
@@ -80,9 +79,13 @@
 
 <script type="module">
     import { Muxer, ArrayBufferTarget } from './lib/mp4-muxer.js';
-    const { createFFmpeg, fetchFile } = FFmpeg;
-
-    const ffmpeg = createFFmpeg({ log: false, corePath: window.location.origin + './lib/ffmpeg-core.js' });
+    const ffmpegHost = window.parent;
+    if (!ffmpegHost || ffmpegHost === window || !ffmpegHost.SharedFFmpeg || !ffmpegHost.FFmpeg) {
+        document.body.innerHTML = '<div style="padding:24px;font-family:sans-serif">请从 index.html 打开此页面。</div>';
+        throw new Error('请从 index.html 进入此页面');
+    }
+    const { fetchFile } = ffmpegHost.FFmpeg;
+    const ffmpeg = ffmpegHost.SharedFFmpeg.getOrCreate(ffmpegHost.__sharedFFmpegConfig);
     
     const [fileIn, startBtn, status, progFill, progBox, targetWIn, targetHIn, targetFPSIn, targetBitrateIn, fileListView, useCopyCheck, useGPUCheck, hVideo, hCanvas] = 
         ['fileIn', 'startBtn', 'status', 'prog-fill', 'progBox', 'targetW', 'targetH', 'targetFPS', 'targetBitrate', 'fileListView', 'useCopy', 'useGPU', 'h-video', 'h-canvas'].map(id => document.getElementById(id));
@@ -99,7 +102,7 @@
             return;
         }
         try {
-            await ffmpeg.load();
+            await ffmpegHost.SharedFFmpeg.load(ffmpegHost.__sharedFFmpegConfig);
             fileIn.disabled = false;
             status.innerText = "FFmpeg 就绪，请添加文件";
             renderList();

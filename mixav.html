@@ -5,7 +5,6 @@
 <head>
     <meta charset="UTF-8">
     <title>音视频合并/替换工具</title>
-    <script src="./lib/ffmpeg.min.js"></script>
     <style>
         body { font-family: system-ui, sans-serif; background: #f1f5f9; padding: 20px; display: flex; justify-content: center; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); width: 100%; max-width: 600px; }
@@ -44,31 +43,29 @@
     </div>
 
     <button id="mergeBtn" class="btn-merge" disabled>正在初始化引擎...</button>
-    
-    <div id="log">等待 FFmpeg 加载...</div>
 </div>
 
 <script>
-    const { createFFmpeg, fetchFile } = FFmpeg;
-    const ffmpeg = createFFmpeg({
-        corePath: new URL('./lib/ffmpeg-core.js', document.location).href,
-        log: true,
-    });
+    const ffmpegHost = window.parent;
+    if (!ffmpegHost || ffmpegHost === window || !ffmpegHost.SharedFFmpeg || !ffmpegHost.FFmpeg) {
+        document.body.innerHTML = '<div style="padding:24px;font-family:sans-serif">请从 index.html 打开此页面。</div>';
+        throw new Error('请从 index.html 进入此页面');
+    }
+    const { fetchFile } = ffmpegHost.FFmpeg;
+    const ffmpeg = ffmpegHost.SharedFFmpeg.getOrCreate(ffmpegHost.__sharedFFmpegConfig);
 
     const vInput = document.getElementById('videoInput');
     const aInput = document.getElementById('audioInput');
     const mergeBtn = document.getElementById('mergeBtn');
-    const logEl = document.getElementById('log');
 
     function addLog(msg) {
-        logEl.innerText += `\n[${new Date().toLocaleTimeString()}] ${msg}`;
-        logEl.scrollTop = logEl.scrollHeight;
+        console.log('[mixav]', msg);
     }
 
     // 初始化引擎
     (async () => {
         try {
-            await ffmpeg.load();
+            await ffmpegHost.SharedFFmpeg.load(ffmpegHost.__sharedFFmpegConfig);
             mergeBtn.innerText = "立即合并并下载";
             mergeBtn.disabled = false;
             addLog("FFmpeg 引擎就绪。");

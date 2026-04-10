@@ -2,12 +2,10 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>XWS 媒体格式转换器</title>
-    <script src="./lib/ffmpeg.min.js"></script>
+    <title>录屏转换修复</title>
     <style>
         body { font-family: system-ui, sans-serif; background: #f4f4f9; padding: 20px; display: flex; justify-content: center; }
         .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
-        #log { background: #1a1a1b; color: #00ff00; padding: 10px; height: 150px; overflow-y: auto; font-family: monospace; font-size: 11px; margin-top: 15px; border-radius: 4px; }
         .file-box { border: 2px dashed #007bff; padding: 20px; text-align: center; margin: 15px 0; cursor: pointer; }
         button { width: 100%; padding: 10px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         button:disabled { background: #ccc; }
@@ -16,7 +14,7 @@
 <body>
 
 <div class="card">
-    <h3>XWS 修复并转 MP4</h3>
+    <h3>录屏转换修复</h3>
     <div id="status">正在加载引擎...</div>
     
     <div class="file-box" onclick="document.getElementById('fileInput').click()">
@@ -25,33 +23,27 @@
     </div>
 
     <button id="startBtn" disabled>开始转换</button>
-    <div id="log"></div>
 </div>
 
 <script>
-    const { createFFmpeg, fetchFile } = FFmpeg;
+    const ffmpegHost = window.parent;
+    if (!ffmpegHost || ffmpegHost === window || !ffmpegHost.SharedFFmpeg || !ffmpegHost.FFmpeg) {
+        document.body.innerHTML = '<div style="padding:24px;font-family:sans-serif">请从 index.html 打开此页面。</div>';
+        throw new Error('请从 index.html 进入此页面');
+    }
+    const { fetchFile } = ffmpegHost.FFmpeg;
+    const ffmpeg = ffmpegHost.SharedFFmpeg.getOrCreate(ffmpegHost.__sharedFFmpegConfig);
 
-    // 关键修复点：明确 corePath
-    // 使用 window.location.origin 确保路径是基于当前服务器的绝对路径
-    const ffmpeg = createFFmpeg({
-        corePath: new URL('./lib/ffmpeg-core.js', document.location).href,
-        log: true,
-    });
-
-    const logEl = document.getElementById('log');
     const startBtn = document.getElementById('startBtn');
     const statusEl = document.getElementById('status');
 
     function doLog(msg) {
-        const div = document.createElement('div');
-        div.textContent = `> ${msg}`;
-        logEl.appendChild(div);
-        logEl.scrollTop = logEl.scrollHeight;
+        console.log('[xws]', msg);
     }
 
     async function init() {
         try {
-            await ffmpeg.load();
+            await ffmpegHost.SharedFFmpeg.load(ffmpegHost.__sharedFFmpegConfig);
             statusEl.innerText = "✅ 引擎就绪";
             startBtn.disabled = false;
         } catch (e) {

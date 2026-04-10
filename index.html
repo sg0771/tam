@@ -1,315 +1,239 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<link rel="icon" href="data:;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==">
 <head>
-    <meta charset="UTF-8">
-    <title>在线视频处理</title>
-    <script src="./lib/ffmpeg.min.js"></script>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f7f9; padding: 20px; display: flex; justify-content: center; }
-        .card { background: white; padding: 2rem; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 100%; max-width: 650px; }
-        h2 { color: #007aff; text-align: center; margin-bottom: 25px; font-weight: 600; }
-        .field { margin-bottom: 15px; }
-        label { display: block; font-size: 13px; color: #666; margin-bottom: 6px; font-weight: 500; }
-        input, select { width: 100%; padding: 10px; border: 1px solid #e0e0e0; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
-        .preview-container { margin-bottom: 15px; text-align: center; display: none; }
-        #v-preview { width: 100%; border-radius: 8px; background: #000; max-height: 280px; margin-bottom: 10px; }
-        .trim-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; background: #f0f7ff; padding: 12px; border-radius: 10px; border: 1px solid #d0e3ff; }
-        .input-group { display: flex; gap: 5px; }
-        .set-btn { width: 50px !important; padding: 0 !important; background: #007aff !important; color: #fff !important; border: none !important; border-radius: 6px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
-        .btn-stack { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 15px 0; }
-        .action-btn { padding: 12px 5px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; color: white; }
-        #gpu-btn { background: #ff9500; } 
-        #cpu-btn { background: #6f42c1; }
-        #copy-btn { background: #28a745; }
-        .action-btn:disabled { background: #ccc !important; cursor: not-allowed; }
-        #status { margin-top: 15px; font-size: 12px; color: #888; text-align: center; font-family: monospace; min-height: 1.2em; line-height: 1.5; }
-        .prog-bg { width: 100%; height: 6px; background: #eee; border-radius: 3px; margin-top: 15px; display: none; overflow: hidden; }
-        #prog-fill { width: 0%; height: 100%; background: #007aff; transition: width 0.2s; }
-        .info-panel { background: #f8f9fa; border: 1px dashed #d1d9e0; border-radius: 8px; padding: 12px; margin-bottom: 15px; }
-        .est-size-box { padding: 10px; background: #e7f3ff; color: #0056b3; border-radius: 8px; text-align: center; font-weight: bold; }
-        .source-info { text-align: center; font-size: 12px; color: #666; margin-top: 8px; font-family: monospace; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FFmpeg 在线音视频工具箱</title>
+  <link rel="icon" href="data:;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==">
+  <script src="./lib/ffmpeg.min.js"></script>
+  <script src="./shared-ffmpeg.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-2: #1f2937;
+      --line: #334155;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --primary: #3b82f6;
+      --primary-2: #2563eb;
+      --success: #10b981;
+      --danger: #ef4444;
+      --shadow: 0 20px 40px rgba(0,0,0,.25);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: linear-gradient(180deg, #0b1220 0%, #111827 100%);
+      color: var(--text);
+      overflow: hidden;
+    }
+    .app {
+      height: 100%;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+    }
+    .topbar {
+      padding: 18px 22px 12px;
+      border-bottom: 1px solid rgba(148,163,184,.18);
+      background: rgba(15,23,42,.88);
+      backdrop-filter: blur(10px);
+    }
+    .title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .title-wrap h1 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.2;
+      font-weight: 700;
+    }
+    .title-wrap p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .engine-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(30,41,59,.88);
+      border: 1px solid rgba(148,163,184,.18);
+      font-size: 13px;
+      box-shadow: var(--shadow);
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #f59e0b;
+      box-shadow: 0 0 0 4px rgba(245,158,11,.16);
+    }
+    .dot.ready {
+      background: var(--success);
+      box-shadow: 0 0 0 4px rgba(16,185,129,.16);
+    }
+    .dot.error {
+      background: var(--danger);
+      box-shadow: 0 0 0 4px rgba(239,68,68,.16);
+    }
+    .tabs {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 12px 22px 14px;
+      background: rgba(2,6,23,.5);
+      border-bottom: 1px solid rgba(148,163,184,.12);
+    }
+    .tab-btn {
+      border: 1px solid rgba(148,163,184,.16);
+      background: rgba(30,41,59,.9);
+      color: #cbd5e1;
+      padding: 10px 14px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: .2s ease;
+    }
+    .tab-btn:hover { background: rgba(51,65,85,.95); }
+    .tab-btn.active {
+      background: linear-gradient(135deg, var(--primary), var(--primary-2));
+      color: white;
+      border-color: transparent;
+      box-shadow: 0 10px 25px rgba(37,99,235,.3);
+    }
+    .main {
+      min-height: 0;
+      padding: 16px;
+    }
+    .frame-wrap {
+      height: 100%;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(148,163,184,.12);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #fff;
+    }
+    .hint {
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    @media (max-width: 900px) {
+      .title-wrap h1 { font-size: 18px; }
+      .topbar, .tabs, .main { padding-left: 12px; padding-right: 12px; }
+      .main { padding-top: 12px; padding-bottom: 12px; }
+      .frame-wrap { border-radius: 14px; }
+    }
+  </style>
 </head>
 <body>
-
-<div class="card">
-    <h2>在线视频裁剪压缩</h2>
-    
-    <div class="field">
-        <input type="file" id="fileIn" accept="video/*">
+  <div class="app">
+    <div class="topbar">
+      <div class="title-row">
+        <div class="title-wrap">
+          <h1>FFmpeg 在线音视频工具箱</h1>
+          <p>by TamXie</p>
+        </div>
+        <div class="engine-status">
+          <span id="engineDot" class="dot"></span>
+          <span id="engineText">正在初始化 FFmpeg 引擎...</span>
+        </div>
+      </div>
     </div>
 
-    <div id="previewArea" class="preview-container">
-        <video id="v-preview" controls></video>
-        
-        <div class="trim-controls">
-            <div class="field" style="margin-bottom:0">
-                <label>开始时间 (秒)</label>
-                <div class="input-group">
-                    <input type="number" id="startTime" value="0.00" step="0.1">
-                    <button type="button" class="set-btn" onclick="window.setCurrentTime('start')">起点</button>
-                </div>
-            </div>
-            <div class="field" style="margin-bottom:0">
-                <label>结束时间 (秒)</label>
-                <div class="input-group">
-                    <input type="number" id="endTime" value="0.00" step="0.1">
-                    <button type="button" class="set-btn" onclick="window.setCurrentTime('end')">终点</button>
-                </div>
-            </div>
-        </div>
+    <div class="tabs" id="tabs"></div>
 
-        <div class="btn-stack">
-            <button id="gpu-btn" class="action-btn" disabled>GPU 极速压缩</button>
-            <button id="cpu-btn" class="action-btn" disabled>CPU 优质压缩</button>
-            <button id="copy-btn" class="action-btn" disabled>无损流拷贝</button>
-        </div>
-
-        <div class="info-panel">
-            <div class="est-size-box">预估体积: <span id="estimateMB">--</span> MB</div>
-            <div class="source-info">
-                原视频信息：<span id="sourceRes">-- x --</span> | <span id="sourceFps">-- fps</span>
-            </div>
-        </div>
-
-        <div style="background: #fcfcfc; border: 1px solid #eee; padding: 15px; border-radius: 8px;">
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
-                <div class="field">
-                    <label>目标宽度 (Max 1920)</label>
-                    <input type="number" id="width" value="1920" max="1920">
-                </div>
-                <div class="field">
-                    <label>码率 (Mbps)</label>
-                    <input type="number" id="bitrate" value="2.0" step="0.1">
-                </div>
-                <div class="field">
-                    <label>输出帧率</label>
-                    <select id="fpsInput">
-                        <option value="30">30 fps</option>
-                    </select>
-                </div>
-            </div>
-            <div class="field" style="margin-bottom:0">
-                <label>保存文件名</label>
-                <input type="text" id="outName">
-            </div>
-        </div>
+    <div class="main">
+      <div class="frame-wrap">
+        <iframe id="toolFrame" title="工具页面"></iframe>
+      </div>
     </div>
-    
-    <div class="prog-bg" id="progBar"><div id="prog-fill"></div></div>
-    <div id="status">等待上传...</div>
-    <canvas id="c" style="display:none"></canvas>
-</div>
+  </div>
 
-<script type="module">
-    import { Muxer, ArrayBufferTarget } from './lib/mp4-muxer.js';
-    const { createFFmpeg, fetchFile } = FFmpeg;
+  <script>
+    const tools = [
+      { key: 'convert', label: '在线视频裁剪压缩', page: './convert.html' },
+      { key: 'merge', label: '视频合并与截取', page: './merge.html' },
+      { key: 'mixav', label: '音视频合并/替换', page: './mixav.html' },
+      { key: 'audio', label: '提取音频', page: './audio.html' },
+      { key: 'screen', label: '屏幕录制', page: './screen.html' },
+      { key: 'camera', label: '摄像头录制', page: './camera.html' },
+      { key: 'xws', label: 'XWS 转 MP4', page: './xws.html' }
+    ];
 
-    const [gpuBtn, cpuBtn, copyBtn, status, v, startTimeIn, endTimeIn, widthInput, bitrateInput, fpsInput, progFill, estDisplay, fileIn, sourceRes, sourceFps] = 
-        ['gpu-btn','cpu-btn','copy-btn','status','v-preview','startTime','endTime','width','bitrate','fpsInput','prog-fill','estimateMB','fileIn','sourceRes','sourceFps'].map(id => document.getElementById(id));
+    const tabsEl = document.getElementById('tabs');
+    const frameEl = document.getElementById('toolFrame');
+    const engineDot = document.getElementById('engineDot');
+    const engineText = document.getElementById('engineText');
 
-    const ffmpeg = createFFmpeg({ log: false, corePath: window.location.origin + './lib/ffmpeg-core.js' });
-
-    window.setCurrentTime = (type) => {
-        const t = v.currentTime.toFixed(2);
-        if (type === 'start') startTimeIn.value = t;
-        else endTimeIn.value = t;
-        updateEstimate();
+    const ffmpegConfig = {
+      corePath: new URL('./lib/ffmpeg-core.js', document.location).href,
+      log: false,
     };
 
-    function updateEstimate() {
-        const duration = Math.max(0.1, parseFloat(endTimeIn.value) - parseFloat(startTimeIn.value));
-        const br = parseFloat(bitrateInput.value) || 2.0;
-        estDisplay.innerText = (((br + 0.128) * duration) / 8).toFixed(2);
+    window.__sharedFFmpegConfig = ffmpegConfig;
+
+    async function initSharedEngine() {
+      try {
+        engineText.textContent = '正在加载 FFmpeg 单例...';
+        await window.SharedFFmpeg.load(ffmpegConfig);
+        engineDot.classList.remove('error');
+        engineDot.classList.add('ready');
+        engineText.textContent = 'FFmpeg 单例已就绪';
+      } catch (err) {
+        engineDot.classList.remove('ready');
+        engineDot.classList.add('error');
+        engineText.textContent = 'FFmpeg 初始化失败：' + (err?.message || err);
+        console.error(err);
+      }
     }
 
-    [widthInput, bitrateInput, startTimeIn, endTimeIn].forEach(el => el.oninput = updateEstimate);
-
-    (async () => {
-        if (!self.crossOriginIsolated) {
-            status.innerHTML = "<b style='color:#d93025'>环境错误：未检测到跨域隔离。</b><br>请确保 Nginx 响应头包含 COOP/COEP 且使用 HTTPS 访问。";
-            return;
-        }
-        try { await ffmpeg.load(); status.innerText = "FFmpeg 就绪"; } 
-        catch(e) { status.innerText = "引擎加载失败"; }
-    })();
-
-    fileIn.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        v.src = URL.createObjectURL(file);
-        document.getElementById('previewArea').style.display = 'block';
-        
-        v.onloadedmetadata = async () => {
-            endTimeIn.value = v.duration.toFixed(2);
-            document.getElementById('outName').value = `out_${Date.now()}`;
-            
-            // 立即显示分辨率，帧率显示探测中
-            sourceRes.innerText = `${v.videoWidth} x ${v.videoHeight}`;
-            sourceFps.innerText = "探测中...";
-
-            toggleUI(true); // 探测期间锁定按钮
-            status.innerText = "正在探测视频信息...";
-
-            await ffmpeg.FS('writeFile', 'input_raw', await fetchFile(file));
-
-            // 智能探测原文件帧率
-            let detectedFps = 30; // 默认 fallback
-            ffmpeg.setLogger(({ message }) => {
-                const match = message.match(/([\d\.]+)\s*fps/);
-                if (match) detectedFps = parseFloat(match[1]);
-            });
-            // 运行探测（由于不指定输出，必定会抛错，所以用 try...catch 忽略）
-            try { await ffmpeg.run('-i', 'input_raw'); } catch(e) {} 
-            ffmpeg.setLogger(() => {}); // 探测结束，清空日志回调
-
-            // 探测完毕，更新原帧率显示
-            sourceFps.innerText = `${detectedFps} fps`;
-
-            // 计算目标帧率：如果探测出大于30，强行降为30
-            let targetFps = detectedFps > 30 ? 30 : Math.round(detectedFps * 100) / 100;
-            
-            // 动态构建帧率下拉菜单
-            fpsInput.innerHTML = `
-                <option value="${targetFps}">智能匹配 (${targetFps} fps)</option>
-                <option value="15">15 fps</option>
-                <option value="24">24 fps</option>
-                <option value="25">25 fps</option>
-                <option value="30">30 fps</option>
-                <option value="60">60 fps</option>
-            `;
-            fpsInput.value = targetFps.toString();
-
-            toggleUI(false);
-            updateEstimate();
-            status.innerText = "已加载视频";
-        };
-    };
-
-    gpuBtn.onclick = () => runRender('gpu');
-    cpuBtn.onclick = () => runRender('cpu');
-    copyBtn.onclick = () => runRender('copy');
-
-    async function runRender(mode) {
-        const start = parseFloat(startTimeIn.value);
-        const duration = parseFloat(endTimeIn.value) - start;
-        const renderFps = parseFloat(fpsInput.value) || 30;
-        
-        // 强制目标宽度最大为 1920
-        let reqWidth = parseInt(widthInput.value);
-        if (reqWidth > 1920) { reqWidth = 1920; widthInput.value = 1920; }
-        const targetW = Math.floor(reqWidth / 2) * 2;
-        const targetH = Math.floor((targetW * (v.videoHeight / v.videoWidth)) / 2) * 2;
-
-        toggleUI(true);
-
-        try {
-            if (mode === 'copy') {
-                await ffmpeg.run('-ss', start.toString(), '-t', duration.toString(), '-i', 'input_raw', '-c', 'copy', 'out.mp4');
-                downloadFinal('out.mp4');
-            } 
-            else if (mode === 'cpu') {
-                ffmpeg.setProgress(({ ratio }) => { progFill.style.width = Math.floor(ratio * 100) + '%'; });
-                // 加入 -r 控制输出帧率
-                await ffmpeg.run('-ss', start.toString(), '-t', duration.toString(), '-i', 'input_raw', '-vf', `scale=${targetW}:-2`, '-r', renderFps.toString(), '-b:v', bitrateInput.value+'M', '-c:a', 'aac', 'out.mp4');
-                downloadFinal('out.mp4');
-            } 
-            else if (mode === 'gpu') {
-                const codecConfigs = [
-                    { codec: 'avc1.640033', hardwareAcceleration: 'prefer-hardware' }, // 硬件 High Profile Level 5.1
-                    { codec: 'avc1.4D4033', hardwareAcceleration: 'prefer-hardware' }, // 硬件 Main Profile Level 5.1
-                    { codec: 'avc1.42E033', hardwareAcceleration: 'prefer-hardware' }, // 硬件 Baseline Profile Level 5.1
-                    { codec: 'avc1.4D4028', hardwareAcceleration: 'prefer-software' }  // 软件兜底 Main Profile Level 4.0
-                ];
-
-                let selectedConfig = null;
-                for (const baseConfig of codecConfigs) {
-                    const testConfig = { 
-                        ...baseConfig, 
-                        width: targetW, 
-                        height: targetH, 
-                        bitrate: parseFloat(bitrateInput.value) * 1_000_000,
-                        framerate: renderFps,            // 明确指定编码帧率
-                        bitrateMode: 'constant'          // 使用固定码率(CBR)，强制贴近设定值
-                    };
-                    const support = await VideoEncoder.isConfigSupported(testConfig);
-                    if (support.supported) {
-                        selectedConfig = testConfig;
-                        break;
-                    }
-                }
-
-                if (!selectedConfig) {
-                    throw new Error(`当前设备不支持在 [${targetW}x${targetH}] 分辨率下进行编码，请尝试调小目标宽度。`);
-                }
-
-                const renderType = selectedConfig.hardwareAcceleration === 'prefer-hardware' ? 'GPU' : '浏览器软件';
-                status.innerText = `${renderType}模式: 使用配置 ${selectedConfig.codec} @ ${renderFps}fps`;
-
-                // 2. 提取 AAC 音频
-                await ffmpeg.run('-ss', start.toString(), '-t', duration.toString(), '-i', 'input_raw', '-vn', '-c:a', 'aac', '-b:a', '128k', 'audio_tmp.m4a');
-
-                // 3. 画面编码
-                const canvas = document.getElementById('c');
-                canvas.width = targetW; canvas.height = targetH;
-                const ctx = canvas.getContext('2d', { alpha: false });
-
-                const muxer = new Muxer({ 
-                    target: new ArrayBufferTarget(), 
-                    video: { codec: 'avc', width: targetW, height: targetH },
-                    fastStart: 'in-memory'
-                });
-
-                const encoder = new VideoEncoder({ 
-                    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), 
-                    error: e => { throw new Error("VideoEncoder 运行错误: " + e.message); } 
-                });
-
-                encoder.configure(selectedConfig);
-
-                const totalFrames = Math.floor(duration * renderFps);
-                for (let i = 0; i < totalFrames; i++) {
-                    v.currentTime = start + (i / renderFps);
-                    await new Promise(r => { const f = () => { v.removeEventListener('seeked', f); r(); }; v.addEventListener('seeked', f); });
-                    ctx.drawImage(v, 0, 0, targetW, targetH);
-                    const frame = new VideoFrame(canvas, { timestamp: (i * 1_000_000 / renderFps) });
-                    encoder.encode(frame, { keyFrame: i % 60 === 0 });
-                    frame.close();
-                    if (i % 5 === 0) {
-                        const p = Math.floor((i / totalFrames) * 100);
-                        progFill.style.width = p + '%';
-                        status.innerText = `${renderType} 渲染: ${p}% (使用配置 ${selectedConfig.codec})`;
-                    }
-                }
-                await encoder.flush();
-                muxer.finalize();
-
-                ffmpeg.FS('writeFile', 'video_tmp.mp4', new Uint8Array(muxer.target.buffer));
-                await ffmpeg.run('-i', 'video_tmp.mp4', '-i', 'audio_tmp.m4a', '-c', 'copy', 'out_gpu.mp4');
-                downloadFinal('out_gpu.mp4');
-            }
-        } catch (err) {
-            status.innerText = "错误: " + err.message;
-        } finally {
-            toggleUI(false);
-        }
+    function setActiveTab(key) {
+      const item = tools.find(t => t.key === key) || tools[0];
+      history.replaceState(null, '', '#'+item.key);
+      Array.from(tabsEl.querySelectorAll('.tab-btn')).forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.key === item.key);
+      });
+      if (frameEl.getAttribute('src') !== item.page) {
+        frameEl.src = item.page;
+      }
     }
 
-    function downloadFinal(name) {
-        const data = ffmpeg.FS('readFile', name);
-        const a = document.createElement('a');
-        const outName = document.getElementById('outName').value || 'video';
-        a.href = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
-        a.download = outName + '.mp4';
-        a.click();
-        status.innerText = "✅ 处理完成";
+    function renderTabs() {
+      tabsEl.innerHTML = tools.map(item =>
+        `<button class="tab-btn" data-key="${item.key}" type="button">${item.label}</button>`
+      ).join('');
+      tabsEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('.tab-btn');
+        if (!btn) return;
+        setActiveTab(btn.dataset.key);
+      });
     }
 
-    function toggleUI(disabled) {
-        [gpuBtn, cpuBtn, copyBtn, widthInput, bitrateInput, fpsInput].forEach(b => b.disabled = disabled);
-        document.getElementById('progBar').style.display = disabled ? 'block' : 'none';
-    }
-</script>
+    window.addEventListener('hashchange', () => {
+      const key = location.hash.replace(/^#/, '') || tools[0].key;
+      setActiveTab(key);
+    });
+
+    renderTabs();
+    setActiveTab(location.hash.replace(/^#/, '') || tools[0].key);
+    initSharedEngine();
+  </script>
 </body>
 </html>

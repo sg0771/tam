@@ -5,7 +5,6 @@
 <head>
     <meta charset="UTF-8">
     <title>音频提取工具</title>
-    <script src="./lib/ffmpeg.min.js"></script>
     <style>
         body { font-family: system-ui, sans-serif; background: #f8fafc; padding: 20px; display: flex; justify-content: center; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); width: 100%; max-width: 600px; border: 1px solid #e2e8f0; }
@@ -65,15 +64,15 @@
     </div>
 
     <button id="startBtn" class="btn-run" disabled>加载中...</button>
-    <div id="log">正在连接 FFmpeg 核心...</div>
 </div>
 
 <script>
-    const { createFFmpeg } = FFmpeg;
-    const ffmpeg = createFFmpeg({
-        corePath: new URL('./lib/ffmpeg-core.js', document.location).href,
-        log: true,
-    });
+    const ffmpegHost = window.parent;
+    if (!ffmpegHost || ffmpegHost === window || !ffmpegHost.SharedFFmpeg || !ffmpegHost.FFmpeg) {
+        document.body.innerHTML = '<div style="padding:24px;font-family:sans-serif">请从 index.html 打开此页面。</div>';
+        throw new Error('请从 index.html 进入此页面');
+    }
+    const ffmpeg = ffmpegHost.SharedFFmpeg.getOrCreate(ffmpegHost.__sharedFFmpegConfig);
 
     const el = {
         log: document.getElementById('log'),
@@ -95,12 +94,12 @@
     // 初始化
     (async () => {
         try {
-            await ffmpeg.load();
+            await ffmpegHost.SharedFFmpeg.load(ffmpegHost.__sharedFFmpegConfig);
             el.startBtn.innerText = "开始提取音频";
             el.startBtn.disabled = false;
-            el.log.innerText = "就绪：请选择文件并设置参数。";
+            console.log('[audio]', 'FFmpeg 就绪：请选择文件并设置参数。');
         } catch (e) {
-            el.log.innerText = "错误：无法加载 FFmpeg 核心。请检查 ./lib/ 目录及服务器 Header。";
+            console.error('[audio]', '无法加载 FFmpeg 核心', e);
         }
     })();
 
