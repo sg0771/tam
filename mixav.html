@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>音视频合并/替换工具</title>
+    <script src="./lib/ffmpeg.min.js"></script>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #f1f5f9; padding: 20px; display: flex; justify-content: center; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); width: 100%; max-width: 600px; }
+        h2 { margin: 0 0 20px 0; color: #0f172a; font-size: 1.25rem; text-align: center; }
+        .file-section { display: flex; flex-direction: column; gap: 15px; margin-bottom: 25px; }
+        .file-input { border: 2px dashed #cbd5e1; padding: 15px; border-radius: 8px; text-align: center; position: relative; }
+        .file-input:hover { border-color: #3b82f6; background: #f8fafc; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px; color: #475569; text-align: left; }
+        #log { background: #1e293b; color: #38bdf8; padding: 12px; height: 180px; overflow-y: auto; font-family: monospace; font-size: 11px; border-radius: 6px; margin-top: 20px; white-space: pre-wrap; }
+        .btn-merge { width: 100%; padding: 14px; background: #2563eb; color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 16px; }
+        .btn-merge:disabled { background: #94a3b8; cursor: not-allowed; }
+        .tip { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>🎬 音视频合并 / 替换音频</h2>
+    
+    <div class="file-section">
+        <div>
+            <label>1. 选择视频文件 (MP4/MKV等)</label>
+            <div class="file-input">
+                <input type="file" id="videoInput" accept="video/*">
+                <div class="tip" id="vName">未选择视频</div>
+            </div>
+        </div>
+        
+        <div>
+            <label>2. 选择音频文件 (MP3/WAV/AAC等)</label>
+            <div class="file-input">
+                <input type="file" id="audioInput" accept="audio/*">
+                <div class="tip" id="aName">未选择音频</div>
+            </div>
+        </div>
+    </div>
+
+    <button id="mergeBtn" class="btn-merge" disabled>正在初始化引擎...</button>
+    
+    <div id="log">等待 FFmpeg 加载...</div>
+</div>
+
+<script>
+    const { createFFmpeg, fetchFile } = FFmpeg;
+    const ffmpeg = createFFmpeg({
+        corePath: new URL('./lib/ffmpeg-core.js', document.location).href,
+        log: true,
+    });
+
+    const vInput = document.getElementById('videoInput');
+    const aInput = document.getElementById('audioInput');
+    const mergeBtn = document.getElementById('mergeBtn');
+    const logEl = document.getElementById('log');
+
+    function addLog(msg) {
+        logEl.innerText += `\n[${new Date().toLocaleTimeString()}] ${msg}`;
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    // 初始化引擎
+    (async () => {
+        try {
+            await ffmpeg.load();
+            mergeBtn.innerText = "立即合并并下载";
+            mergeBtn.disabled = false;
+            addLog("FFmpeg 引擎就绪。");
+        } catch (e) {
+            addLog("错误: 无法加载核心文件，请检查 ./lib 目录。");
+        }
+    })();
+
+    // 监听文件选择显示名称
+    vInput.onchange = () => document.getElementById('vName').innerText = vInput.files[0]?.name || "未选择视频";
+    aInput.onchange = () => document.getElementById('aName').innerText = aInput.files[0]?.name || "未选择音频";
+
+    mergeBtn.onclick = async () => {
+        const vFile = vInput.files[0];
+        const aFile = aInput.files[0];
+
+        if (!vFile || !aFile) return alert("请确保视频和音频文件都已选择！");
+
+        mergeBtn.disabled = true;
+        addLog("开始读取文件并准备合并...");
+
+        try {
+            // 1. 准备文件名和数据
+            const vExt = vFile.name.split('.').pop();
+            const aExt = aFile.name.split('.').pop();
+            const vTmp = `in_video.${vExt}`;
+            const aTmp = `in_audio.${aExt}`;
+            
+            // 保持原视频文件名为输出名，并确保后缀是 .mp4
+            const baseName = vFile.name.substring(0, vFile.name.lastIndexOf('.')) || "output";
+            const outName = `${baseName}_merged.mp4`;
+
+            // 2. 写入虚拟文件系统
+            ffmpeg.FS('writeFile', vTmp, await fetchFile(vFile));
+            ffmpeg.FS('writeFile', aTmp, await fetchFile(aFile));
+
+            addLog("正在合并流 (视频复制 + 音频转码)...");
+
+            /**
+             * 参数解析:
+             * -i [video] -i [audio]: 两个输入
+             * -map 0:v:0: 取第一个文件的视频流
+             * -map 1:a:0: 取第二个文件的音频流
+             * -c:v copy: 视频不重编码，保持原画质，速度极快
+             * -c:a aac: 音频转为 AAC 编码以确保 MP4 兼容性
+             * -shortest: 如果音频比视频长，自动在视频结束处切断（可选）
+             */
+            await ffmpeg.run(
+                '-i', vTmp, 
+                '-i', aTmp, 
+                '-map', '0:v:0', 
+                '-map', '1:a:0', 
+                '-c:v', 'copy', 
+                '-c:a', 'aac', 
+                '-shortest', 
+                outName
+            );
+
+            addLog("合并完成，准备下载...");
+
+            // 3. 读取结果
+            const data = ffmpeg.FS('readFile', outName);
+            const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
+
+            // 4. 触发下载
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = outName;
+            a.click();
+
+            addLog(`✨ 成功！文件已保存为: ${outName}`);
+
+            // 5. 清理
+            ffmpeg.FS('unlink', vTmp);
+            ffmpeg.FS('unlink', aTmp);
+            ffmpeg.FS('unlink', outName);
+
+        } catch (err) {
+            addLog(`❌ 出错: ${err.message}`);
+            console.error(err);
+        } finally {
+            mergeBtn.disabled = false;
+        }
+    };
+</script>
+</body>
+</html>

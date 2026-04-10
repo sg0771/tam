@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>屏幕录制 Pro - 含码率控制与磁盘直写版</title>
+    <script src="./lib/ffmpeg.min.js"></script>
+    <style>
+        :root { --primary: #007aff; --danger: #d93025; --success: #28a745; --bg: #f5f7f9; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); padding: 20px; display: flex; justify-content: center; }
+        .card { background: white; padding: 2rem; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); width: 100%; max-width: 950px; }
+        h2 { text-align: center; color: var(--primary); margin-top: 0; margin-bottom: 20px; }
+        
+        .preview-wrap { background: #1a1a1a; border-radius: 12px; overflow: hidden; position: relative; margin-bottom: 20px; aspect-ratio: 16/9; border: 2px solid #ddd; }
+        video#preview { width: 100%; height: 100%; object-fit: contain; }
+        
+        /* 录制状态 */
+        .rec-status { position: absolute; top: 15px; left: 15px; display: none; align-items: center; gap: 8px; z-index: 10; background: rgba(0,0,0,0.7); padding: 6px 12px; border-radius: 20px; }
+        .dot { width: 10px; height: 10px; background: #ff4d4f; border-radius: 50%; animation: blink 1s infinite; }
+        .timer { color: #fff; font-family: monospace; font-size: 15px; font-weight: bold; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        /* 配置网格：改为 4 列以容纳码率 */
+        .config-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+        .field { display: flex; flex-direction: column; gap: 6px; }
+        label { font-size: 11px; font-weight: bold; color: #666; text-transform: uppercase; }
+        select, input { padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; outline: none; background: #fff; }
+
+        .actions { display: flex; gap: 12px; }
+        .btn { flex: 1; padding: 15px; border: none; border-radius: 10px; font-weight: bold; font-size: 15px; cursor: pointer; color: white; transition: all 0.2s; }
+        .btn:disabled { background: #ccc !important; cursor: not-allowed; }
+        #btn-select-source { background: #6c757d; }
+        #btn-start { background: var(--danger); }
+        #btn-stop { background: var(--success); }
+
+        .info-bar { margin-top: 15px; padding: 10px; background: #e6f7ff; border: 1px solid #91d5ff; border-radius: 8px; font-size: 12px; color: #0050b3; }
+        #status-msg { text-align: center; margin-top: 10px; font-size: 13px; color: #888; min-height: 1.5em; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>屏幕录制 Pro (码率自定义版)</h2>
+
+    <div class="preview-wrap">
+        <div class="rec-status" id="rec-ui">
+            <div class="dot"></div>
+            <span class="timer" id="rec-timer">00:00:00</span>
+        </div>
+        <video id="preview" autoplay playsinline muted></video>
+    </div>
+
+    <div class="config-grid">
+        <div class="field">
+            <label>音频混合</label>
+            <select id="audio-mode">
+                <option value="mix" selected>系统音 + 麦克风</option>
+                <option value="sys">仅系统声音</option>
+                <option value="mic">仅麦克风</option>
+                <option value="none">无声录制</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>编码引擎</label>
+            <select id="encode-engine">
+                <option value="gpu">GPU 硬件加速</option>
+                <option value="cpu">CPU 软件编码</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>视频码率 (Mbps)</label>
+            <input type="number" id="v-bitrate" value="6.0" step="0.5" min="0.5">
+        </div>
+        <div class="field">
+            <label>存储方式</label>
+            <select id="write-mode">
+                <option value="disk">直接写硬盘(防崩)</option>
+                <option value="ram">缓存到内存</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="actions">
+        <button id="btn-select-source" class="btn">1. 选择录制内容</button>
+        <button id="btn-start" class="btn" disabled>2. 开始录制</button>
+        <button id="btn-stop" class="btn" disabled>3. 停止并保存</button>
+    </div>
+
+    <div class="info-bar" id="source-info">
+        💡 提示：点击选择内容后，请务必勾选弹窗左下角的“分享系统音频”。
+    </div>
+    <div id="status-msg">等待 FFmpeg 核心加载...</div>
+</div>
+
+<script type="module">
+    import { Muxer, ArrayBufferTarget, StreamTarget } from './lib/mp4-muxer.js';
+    const { createFFmpeg, fetchFile } = FFmpeg;
+
+    const ffmpeg = createFFmpeg({ log: false, corePath: new URL('./lib/ffmpeg-core.js', document.location).href });
+    const el = {
+        preview: document.getElementById('preview'),
+        status: document.getElementById('status-msg'),
+        sourceInfo: document.getElementById('source-info'),
+        btnSelect: document.getElementById('btn-select-source'),
+        btnStart: document.getElementById('btn-start'),
+        btnStop: document.getElementById('btn-stop'),
+        recUI: document.getElementById('rec-ui'),
+        recTimer: document.getElementById('rec-timer'),
+        bitrateInput: document.getElementById('v-bitrate')
+    };
+
+    let screenStream = null;
+    let micStream = null;
+    let isRecording = false;
+    let recStartTime = 0;
+    let timerId = null;
+    let vEncoder = null, aEncoder = null, muxer = null;
+    let writableFileStream = null;
+
+    (async () => {
+        try {
+            await ffmpeg.load();
+            el.status.innerText = "✅ FFmpeg 引擎已就绪";
+        } catch (e) { el.status.innerText = "❌ 加载失败，请检查跨域隔离配置。"; }
+    })();
+
+    // 1. 选择源
+    el.btnSelect.onclick = async () => {
+        if (screenStream) screenStream.getTracks().forEach(t => t.stop());
+        try {
+            screenStream = await navigator.mediaDevices.getDisplayMedia({
+                video: { cursor: "always" },
+                audio: true 
+            });
+            el.preview.srcObject = screenStream;
+            el.btnStart.disabled = false;
+
+            const vTrack = screenStream.getVideoTracks()[0];
+            const settings = vTrack.getSettings();
+            el.sourceInfo.innerHTML = `✅ 已连接：${settings.width}x${settings.height} @ ${Math.floor(settings.frameRate || 30)}FPS`;
+            
+            vTrack.onended = () => { if(isRecording) el.btnStop.click(); };
+            el.status.innerText = "🎬 信号就绪";
+        } catch (err) { alert("未选择源: " + err.message); }
+    };
+
+    // 2. 开始录制
+    el.btnStart.onclick = async () => {
+        const audioMode = document.getElementById('audio-mode').value;
+        const writeMode = document.getElementById('write-mode').value;
+        const engine = document.getElementById('encode-engine').value;
+        const bitrateMbps = parseFloat(el.bitrateInput.value) || 6.0;
+
+        if (writeMode === 'disk') {
+            try {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: `ScreenRecord_${Date.now()}.mp4`,
+                    types: [{ description: 'Video', accept: {'video/mp4': ['.mp4']} }]
+                });
+                writableFileStream = await handle.createWritable();
+            } catch (e) { return; }
+        }
+
+        const finalStream = new MediaStream();
+        finalStream.addTrack(screenStream.getVideoTracks()[0]);
+
+        try {
+            if (audioMode !== 'none') {
+                let tracks = [];
+                if (audioMode === 'sys' || audioMode === 'mix') {
+                    if (screenStream.getAudioTracks().length > 0) tracks.push(screenStream.getAudioTracks()[0]);
+                }
+                if (audioMode === 'mic' || audioMode === 'mix') {
+                    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    tracks.push(micStream.getAudioTracks()[0]);
+                }
+
+                if (tracks.length > 1) {
+                    const ctx = new AudioContext();
+                    const dest = ctx.createMediaStreamDestination();
+                    tracks.forEach(t => ctx.createMediaStreamSource(new MediaStream([t])).connect(dest));
+                    finalStream.addTrack(dest.stream.getAudioTracks()[0]);
+                } else if (tracks.length === 1) {
+                    finalStream.addTrack(tracks[0]);
+                }
+            }
+
+            isRecording = true;
+            el.btnStart.disabled = true; el.btnStop.disabled = false; el.recUI.style.display = 'flex';
+            
+            if (engine === 'gpu' && window.VideoEncoder) {
+                await startGPURec(finalStream, bitrateMbps);
+            } else {
+                await startCPURec(finalStream, bitrateMbps);
+            }
+
+            recStartTime = Date.now();
+            timerId = setInterval(() => {
+                const s = Math.floor((Date.now() - recStartTime) / 1000);
+                el.recTimer.innerText = new Date(s * 1000).toISOString().substr(11, 8);
+            }, 1000);
+
+        } catch (err) { alert("初始化失败: " + err.message); isRecording = false; el.btnStart.disabled = false; }
+    };
+
+    // 核心：GPU 录制逻辑
+    async function startGPURec(stream, mbps) {
+        const vTrack = stream.getVideoTracks()[0];
+        const settings = vTrack.getSettings();
+        const w = settings.width, h = settings.height, fps = Math.floor(settings.frameRate || 30);
+        const bps = mbps * 1_000_000; // Mbps 转为 bps
+
+        const profiles = [{codec:'avc1.640033'}, {codec:'avc1.4D4033'}, {codec:'avc1.42E01F'}];
+        let selectedCodec = 'avc1.42E01F';
+        for (const p of profiles) {
+            const support = await VideoEncoder.isConfigSupported({ codec: p.codec, width: w, height: h, bitrate: bps, framerate: fps });
+            if (support.supported) { selectedCodec = p.codec; break; }
+        }
+
+        const aTrack = stream.getAudioTracks()[0];
+        let aConf = null;
+        if (aTrack) {
+            const aSet = aTrack.getSettings();
+            aConf = { codec: 'mp4a.40.2', sampleRate: aSet.sampleRate, numberOfChannels: aSet.channelCount || 2, bitrate: 128_000 };
+        }
+
+        let target = writableFileStream ? 
+            new StreamTarget({ onData: (data, pos) => writableFileStream.write({ type: 'write', data, position: pos }) }) : 
+            new ArrayBufferTarget();
+
+        muxer = new Muxer({
+            target,
+            video: { codec: 'avc', width: w, height: h },
+            audio: aConf ? { codec: 'aac', sampleRate: aConf.sampleRate, numberOfChannels: aConf.numberOfChannels } : undefined,
+            fastStart: 'fragmented',
+            firstTimestampBehavior: 'offset'
+        });
+
+        vEncoder = new VideoEncoder({
+            output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+            error: e => el.status.innerText = "❌ 视频错误: " + e.message
+        });
+        vEncoder.configure({ codec: selectedCodec, width: w, height: h, bitrate: bps, framerate: fps });
+
+        if (aConf) {
+            aEncoder = new AudioEncoder({
+                output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+                error: e => el.status.innerText = "❌ 音频错误: " + e.message
+            });
+            aEncoder.configure(aConf);
+            const aReader = new MediaStreamTrackProcessor(aTrack).readable.getReader();
+            (async () => {
+                while(isRecording) {
+                    const {done, value} = await aReader.read();
+                    if(done) break;
+                    if(aEncoder.state === 'configured') aEncoder.encode(value);
+                    value.close();
+                }
+            })();
+        }
+
+        const vReader = new MediaStreamTrackProcessor(vTrack).readable.getReader();
+        el.status.innerText = `🚀 GPU 录制中 (${mbps}Mbps)`;
+        while(isRecording) {
+            const {done, value} = await vReader.read();
+            if(done) break;
+            if(vEncoder.state === 'configured') vEncoder.encode(value);
+            value.close();
+        }
+    }
+
+    // 核心：CPU 录制逻辑
+    async function startCPURec(stream, mbps) {
+        const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=h264' });
+        const chunks = [];
+        recorder.ondataavailable = e => {
+            if (writableFileStream) writableFileStream.write(e.data);
+            else chunks.push(e.data);
+        };
+        recorder.onstop = async () => {
+            if (writableFileStream) { await writableFileStream.close(); el.status.innerText = "✅ 录制完成"; }
+            else {
+                el.status.innerText = "⏳ 正在通过 FFmpeg 优化容器并应用码率限制...";
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                ffmpeg.FS('writeFile', 'in.webm', await fetchFile(blob));
+                // CPU 模式在后期封装时使用 -b:v 再次约束（针对转码场景）
+                await ffmpeg.run('-i', 'in.webm', '-c:v', 'copy', '-b:v', mbps + 'M', '-movflags', 'frag_keyframe+empty_moov', 'out.mp4');
+                saveFile(ffmpeg.FS('readFile', 'out.mp4'));
+            }
+        };
+        window._cpuRec = recorder;
+        recorder.start(1000);
+        el.status.innerText = `🐌 CPU 录制中 (${mbps}Mbps 目标)`;
+    }
+
+    el.btnStop.onclick = async () => {
+        isRecording = false; clearInterval(timerId);
+        el.recUI.style.display = 'none'; el.btnStart.disabled = false; el.btnStop.disabled = true;
+        
+        if (vEncoder) {
+            if (vEncoder.state === 'configured') await vEncoder.flush();
+            vEncoder.close();
+            if (aEncoder && aEncoder.state === 'configured') { await aEncoder.flush(); aEncoder.close(); }
+            muxer.finalize();
+            if (writableFileStream) {
+                await writableFileStream.close();
+                el.status.innerText = "✅ 录制已保存到硬盘";
+            } else {
+                saveFile(new Uint8Array(muxer.target.buffer));
+            }
+            vEncoder = aEncoder = null;
+        } else if (window._cpuRec) { window._cpuRec.stop(); }
+        
+        if(screenStream) screenStream.getTracks().forEach(t => t.stop());
+        if(micStream) micStream.getTracks().forEach(t => t.stop());
+    };
+
+    function saveFile(data) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
+        a.download = `ScreenRec_${Date.now()}.mp4`; a.click();
+    }
+</script>
+</body>
+</html>
