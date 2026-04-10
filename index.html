@@ -110,7 +110,7 @@
     const [gpuBtn, cpuBtn, copyBtn, status, v, startTimeIn, endTimeIn, widthInput, bitrateInput, fpsInput, progFill, estDisplay, fileIn, sourceRes, sourceFps] = 
         ['gpu-btn','cpu-btn','copy-btn','status','v-preview','startTime','endTime','width','bitrate','fpsInput','prog-fill','estimateMB','fileIn','sourceRes','sourceFps'].map(id => document.getElementById(id));
 
-    const ffmpeg = createFFmpeg({ log: false, corePath: window.location.origin + '/lib/ffmpeg-core.js' });
+    const ffmpeg = createFFmpeg({ log: false, corePath: window.location.origin + './lib/ffmpeg-core.js' });
 
     window.setCurrentTime = (type) => {
         const t = v.currentTime.toFixed(2);

@@ -83,7 +83,7 @@
     import { Muxer, ArrayBufferTarget } from './lib/mp4-muxer.js';
     const { createFFmpeg, fetchFile } = FFmpeg;
 
-    const ffmpeg = createFFmpeg({ log: false, corePath: window.location.origin + '/lib/ffmpeg-core.js' });
+    const ffmpeg = createFFmpeg({ log: false, corePath: window.location.origin + './lib/ffmpeg-core.js' });
     
     const [fileIn, startBtn, status, progFill, progBox, targetWIn, targetHIn, targetFPSIn, targetBitrateIn, fileListView, useCopyCheck, useGPUCheck, hVideo, hCanvas] = 
         ['fileIn', 'startBtn', 'status', 'prog-fill', 'progBox', 'targetW', 'targetH', 'targetFPS', 'targetBitrate', 'fileListView', 'useCopy', 'useGPU', 'h-video', 'h-canvas'].map(id => document.getElementById(id));
