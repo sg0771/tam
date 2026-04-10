@@ -22,8 +22,6 @@
 <body>
 
 <div class="card">
-    <h2>🎬 音视频合并 / 替换音频</h2>
-    
     <div class="file-section">
         <div>
             <label>1. 选择视频文件 (MP4/MKV等)</label>
@@ -68,9 +66,9 @@
             await ffmpegHost.SharedFFmpeg.load(ffmpegHost.__sharedFFmpegConfig);
             mergeBtn.innerText = "立即合并并下载";
             mergeBtn.disabled = false;
-            addLog("FFmpeg 引擎就绪。");
+            addLog("页面引擎就绪。");
         } catch (e) {
-            addLog("错误: 无法加载核心文件，请检查 ./lib 目录。");
+            addLog("错误: 无法加载wasm核心文件，请检查 ./lib 目录。");
         }
     })();
 

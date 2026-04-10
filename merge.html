@@ -3,7 +3,6 @@
 <link rel="icon" href="data:;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==">
 <head>
     <meta charset="UTF-8">
-    <title>视频合并与截取</title>
     <style>
         body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; display: flex; justify-content: center; }
         .card { background: white; padding: 2rem; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); width: 100%; max-width: 800px; }
@@ -41,7 +40,6 @@
 <body>
 
 <div class="card">
-    <h2>视频合并与截取</h2>
     
     <div class="field-group">
         <label>1. 添加视频文件 (点击项目可预览及截取时间)</label>
@@ -104,7 +102,7 @@
         try {
             await ffmpegHost.SharedFFmpeg.load(ffmpegHost.__sharedFFmpegConfig);
             fileIn.disabled = false;
-            status.innerText = "FFmpeg 就绪，请添加文件";
+            status.innerText = "wasm 就绪，请添加文件";
             renderList();
         } catch (e) { status.innerText = "加载失败。"; }
     })();

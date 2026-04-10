@@ -4,7 +4,6 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>音频提取工具</title>
     <style>
         body { font-family: system-ui, sans-serif; background: #f8fafc; padding: 20px; display: flex; justify-content: center; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); width: 100%; max-width: 600px; border: 1px solid #e2e8f0; }
@@ -24,7 +23,6 @@
 <body>
 
 <div class="card">
-    <h2>🎵 提取音频 (保持原文件名)</h2>
     
     <div style="margin-bottom: 20px;">
         <input type="file" id="fileInput" accept="video/*,audio/*">
@@ -97,9 +95,9 @@
             await ffmpegHost.SharedFFmpeg.load(ffmpegHost.__sharedFFmpegConfig);
             el.startBtn.innerText = "开始提取音频";
             el.startBtn.disabled = false;
-            console.log('[audio]', 'FFmpeg 就绪：请选择文件并设置参数。');
+            console.log('[audio]', '请选择文件并设置参数。');
         } catch (e) {
-            console.error('[audio]', '无法加载 FFmpeg 核心', e);
+            console.error('[audio]', '无法加载 Wasm 核心', e);
         }
     })();
 
@@ -144,7 +142,7 @@
 
         try {
             ffmpeg.FS('writeFile', inputTmp, inputData);
-            addLog("FFmpeg 开始工作...");
+            addLog(" 开始提取音频...");
             
             await ffmpeg.run(...args);
 

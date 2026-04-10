@@ -38,8 +38,6 @@
 <body>
 
 <div class="card">
-    <h2>屏幕录制 Pro (码率自定义版)</h2>
-
     <div class="preview-wrap">
         <div class="rec-status" id="rec-ui">
             <div class="dot"></div>
@@ -87,7 +85,7 @@
     <div class="info-bar" id="source-info">
         💡 提示：点击选择内容后，请务必勾选弹窗左下角的“分享系统音频”。
     </div>
-    <div id="status-msg">等待 FFmpeg 核心加载...</div>
+    <div id="status-msg">等待 wasm 核心加载...</div>
 </div>
 
 <script type="module">
@@ -122,7 +120,7 @@
     (async () => {
         try {
             await ffmpegHost.SharedFFmpeg.load(ffmpegHost.__sharedFFmpegConfig);
-            el.status.innerText = "✅ FFmpeg 引擎已就绪";
+            el.status.innerText = "✅ wasm 引擎已就绪";
         } catch (e) { el.status.innerText = "❌ 加载失败，请检查跨域隔离配置。"; }
     })();
 
@@ -282,7 +280,7 @@
         recorder.onstop = async () => {
             if (writableFileStream) { await writableFileStream.close(); el.status.innerText = "✅ 录制完成"; }
             else {
-                el.status.innerText = "⏳ 正在通过 FFmpeg 优化容器并应用码率限制...";
+                el.status.innerText = "⏳ 正在通过 wasm 优化容器并应用码率限制...";
                 const blob = new Blob(chunks, { type: 'video/webm' });
                 ffmpeg.FS('writeFile', 'in.webm', await fetchFile(blob));
                 // CPU 模式在后期封装时使用 -b:v 再次约束（针对转码场景）

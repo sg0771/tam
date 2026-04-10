@@ -7,7 +7,7 @@
 
   function ensureFFmpegGlobal() {
     if (!global.FFmpeg || typeof global.FFmpeg.createFFmpeg !== 'function') {
-      throw new Error('FFmpeg 全局对象未就绪，请先加载 ./lib/ffmpeg.min.js');
+      throw new Error('wasm 全局对象未就绪，请先加载 ./lib/ffmpeg.min.js');
     }
     return global.FFmpeg;
   }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FFmpeg 在线音视频工具箱</title>
+  <title>在线音视频工具箱</title>
   <link rel="icon" href="data:;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==">
   <script src="./lib/ffmpeg.min.js"></script>
   <script src="./shared-ffmpeg.js"></script>
@@ -147,12 +147,12 @@
     <div class="topbar">
       <div class="title-row">
         <div class="title-wrap">
-          <h1>FFmpeg 在线音视频工具箱</h1>
+          <h1>在线音视频工具箱</h1>
           <p>by TamXie</p>
         </div>
         <div class="engine-status">
           <span id="engineDot" class="dot"></span>
-          <span id="engineText">正在初始化 FFmpeg 引擎...</span>
+          <span id="engineText">正在初始化 wasm 引擎...</span>
         </div>
       </div>
     </div>
@@ -174,7 +174,8 @@
       { key: 'audio', label: '提取音频', page: './audio.html' },
       { key: 'screen', label: '屏幕录制', page: './screen.html' },
       { key: 'camera', label: '摄像头录制', page: './camera.html' },
-      { key: 'xws', label: '文件修复', page: './xws.html' }
+      { key: 'rep', label: '文件修复', page: './rep.html' },
+      { key: 'webrtc', label: 'Webrtc', page: './webrtc.html' }
     ];
 
     const tabsEl = document.getElementById('tabs');
@@ -191,15 +192,15 @@
 
     async function initSharedEngine() {
       try {
-        engineText.textContent = '正在加载 FFmpeg 单例...';
+        engineText.textContent = '页面正在加载...';
         await window.SharedFFmpeg.load(ffmpegConfig);
         engineDot.classList.remove('error');
         engineDot.classList.add('ready');
-        engineText.textContent = 'FFmpeg 单例已就绪';
+        engineText.textContent = '页面已就绪';
       } catch (err) {
         engineDot.classList.remove('ready');
         engineDot.classList.add('error');
-        engineText.textContent = 'FFmpeg 初始化失败：' + (err?.message || err);
+        engineText.textContent = 'Wasm 初始化失败：' + (err?.message || err);
         console.error(err);
       }
     }
