@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>WebRTC SFU 终端</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; background: #f0f2f5; padding: 20px; }
+        .box { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 520px; }
+        video { width: 100%; height: 320px; background: #1a1a1a; border-radius: 8px; margin-bottom: 15px; object-fit: contain; }
+
+        .section-title { font-size: 14px; color: #666; margin: 10px 0 5px 0; font-weight: bold; }
+        .setting-row { display: flex; gap: 10px; margin-bottom: 10px; }
+
+        input, select, button { padding: 10px; border-radius: 6px; border: 1px solid #ddd; outline: none; box-sizing: border-box; }
+        input[type="text"] { flex: 3; }
+        input[type="number"] { flex: 1; }
+
+        .options-group { display: flex; gap: 15px; margin-bottom: 15px; background: #f9f9f9; padding: 10px; border-radius: 6px; border: 1px solid #eee; }
+        .options-group label { display: flex; align-items: center; font-size: 14px; cursor: pointer; }
+        .options-group input { margin-right: 5px; width: auto; }
+
+        button { width: 100%; background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+
+        #unmuteBtn { background: #ffc107; color: #000; margin-bottom: 10px; display: none; border: 2px solid #e0a800; }
+
+        #stat { font-size: 13px; color: #007bff; margin-bottom: 15px; text-align: center; min-height: 18px; font-weight: 500; }
+    </style>
+</head>
+<body>
+
+    <div class="box">
+        <h3 style="margin-top:0">WebRTC SFU 终端</h3>
+
+        <video id="v" autoplay playsinline controls muted></video>
+
+        <button id="unmuteBtn" onclick="unmute()">🔊 点击开启声音 (解除浏览器静音限制)</button>
+
+        <div id="stat">状态: 离线</div>
+
+        <div class="section-title">服务器配置</div>
+        <div class="setting-row">
+            <input type="text" id="ip" placeholder="服务器 IP" value="127.0.0.1">
+            <input type="number" id="port" placeholder="端口" value="8443">
+        </div>
+
+        <div class="section-title">推流采集选项 (仅 Sender 模式)</div>
+        <div class="options-group">
+            <label title="采集麦克风"><input type="checkbox" id="useMic" checked> 麦克风</label>
+            <label title="采集系统扬声器声音"><input type="checkbox" id="useSpeaker"> 扬声器</label>
+            <label title="采集摄像头"><input type="checkbox" id="useCam" checked> 摄像头</label>
+        </div>
+
+        <select id="role" style="width: 100%; margin-bottom: 15px;" onchange="toggleUI()">
+            <option value="sender">推流模式 (Sender)</option>
+            <option value="receiver" selected>拉流模式 (Receiver)</option>
+        </select>
+
+        <button id="btn" onclick="connect()">建立连接</button>
+    </div>
+
+    <script>
+        let pc, ws, localAudioCtx;
+        let senderSourceStreams = [];
+        const v = document.getElementById('v');
+        const stat = document.getElementById('stat');
+        const unmuteBtn = document.getElementById('unmuteBtn');
+
+        function toggleUI() {
+            const role = document.getElementById('role').value;
+            unmuteBtn.style.display = 'none';
+            v.muted = (role === 'sender');
+        }
+
+        function setStatus(text) {
+            stat.innerText = text;
+            console.log(text);
+        }
+
+        function cleanupLocalMedia() {
+            senderSourceStreams.forEach(stream => {
+                try {
+                    stream.getTracks().forEach(track => track.stop());
+                } catch (_) {}
+            });
+            senderSourceStreams = [];
+
+            if (localAudioCtx) {
+                try { localAudioCtx.close(); } catch (_) {}
+                localAudioCtx = null;
+            }
+        }
+
+        function ensureAudioContext() {
+            if (!localAudioCtx) {
+                localAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return localAudioCtx;
+        }
+
+        function appendAudioSourceToMixer(stream, dest, label) {
+            if (!stream || stream.getAudioTracks().length === 0) {
+                console.warn(`${label} 没有可用音频轨`);
+                return false;
+            }
+            const ctx = ensureAudioContext();
+            const source = ctx.createMediaStreamSource(stream);
+            source.connect(dest);
+            console.log(`已接入混音源: ${label}`);
+            return true;
+        }
+
+        async function unmute() {
+            v.muted = false;
+            try {
+                await v.play();
+                unmuteBtn.style.display = 'none';
+                setStatus("状态: 声音已激活");
+            } catch (e) {
+                setStatus("状态: 播放失败 " + e.message);
+            }
+        }
+
+        async function connect() {
+            const role = document.getElementById('role').value;
+            const ip = document.getElementById('ip').value;
+            const port = document.getElementById('port').value;
+            const wsUrl = `ws://${ip}:${port}`;
+
+            document.getElementById('btn').disabled = true;
+            setStatus(`正在连接信令服务器...`);
+
+            cleanupLocalMedia();
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = async () => {
+                try {
+                    setStatus("信令已连接，正在协商 WebRTC...");
+
+                    pc = new RTCPeerConnection({ iceServers: [] });
+
+                    pc.onicecandidate = e => {
+                        if (e.candidate) {
+                            ws.send(JSON.stringify({
+                                type: 'candidate',
+                                candidate: e.candidate.candidate,
+                                mid: e.candidate.sdpMid
+                            }));
+                        }
+                    };
+
+                    if (role === 'sender') {
+                        await setupSender();
+                    } else {
+                        setupReceiver();
+                    }
+
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    ws.send(JSON.stringify({ type: 'offer', role, sdp: offer.sdp }));
+                } catch (e) {
+                    console.error(e);
+                    setStatus(`状态: 建连失败 ${e.message}`);
+                    resetUI();
+                }
+            };
+
+            ws.onmessage = async e => {
+                const m = JSON.parse(e.data);
+                if (m.type === 'answer') {
+                    setStatus("连接已激活，等待媒体数据...");
+                    await pc.setRemoteDescription(new RTCSessionDescription(m));
+                } else if (m.type === 'candidate') {
+                    await pc.addIceCandidate(new RTCIceCandidate(m));
+                } else if (m.type === 'error') {
+                    setStatus(`状态: ${m.message || '服务器返回错误'}`);
+                    resetUI();
+                }
+            };
+
+            ws.onclose = () => {
+                setStatus("状态: 连接已断开");
+                resetUI();
+            };
+
+            ws.onerror = () => {
+                setStatus("状态: 无法连接服务器，请检查 IP 和端口。");
+                resetUI();
+            };
+        }
+
+        async function setupSender() {
+            const useMic = document.getElementById('useMic').checked;
+            const useSpeaker = document.getElementById('useSpeaker').checked;
+            const useCam = document.getElementById('useCam').checked;
+
+            const finalStream = new MediaStream();
+            let mixedAudioTrack = null;
+            let dest = null;
+            let hasMixedAudio = false;
+
+            if (useMic || useSpeaker) {
+                const ctx = ensureAudioContext();
+                dest = ctx.createMediaStreamDestination();
+            }
+
+            // 1. 麦克风 + 摄像头
+            if (useMic || useCam) {
+                try {
+                    const userStream = await navigator.mediaDevices.getUserMedia({
+                        audio: useMic,
+                        video: useCam
+                    });
+                    senderSourceStreams.push(userStream);
+
+                    const videoTrack = userStream.getVideoTracks()[0];
+                    if (videoTrack) {
+                        finalStream.addTrack(videoTrack);
+                    }
+
+                    if (useMic) {
+                        hasMixedAudio = appendAudioSourceToMixer(userStream, dest, '麦克风') || hasMixedAudio;
+                    }
+                } catch (e) {
+                    console.warn('麦克风/摄像头采集失败:', e);
+                }
+            }
+
+            // 2. 系统声音
+            if (useSpeaker) {
+                try {
+                    const displayStream = await navigator.mediaDevices.getDisplayMedia({
+                        video: true,
+                        audio: true
+                    });
+                    senderSourceStreams.push(displayStream);
+
+                    hasMixedAudio = appendAudioSourceToMixer(displayStream, dest, '系统声音') || hasMixedAudio;
+
+                    displayStream.getVideoTracks().forEach(track => track.stop());
+                } catch (e) {
+                    console.warn('系统声音采集失败或被取消:', e);
+                }
+            }
+
+            // 3. 输出混音轨
+            if (hasMixedAudio && dest) {
+                const ctx = ensureAudioContext();
+                if (ctx.state === 'suspended') {
+                    try { await ctx.resume(); } catch (e) { console.warn('AudioContext resume 失败:', e); }
+                }
+                mixedAudioTrack = dest.stream.getAudioTracks()[0] || null;
+                if (mixedAudioTrack) {
+                    finalStream.addTrack(mixedAudioTrack);
+                }
+            }
+
+            // 4. 兜底：啥都没采到也不崩
+            if (finalStream.getTracks().length === 0) {
+                setStatus('状态: 未采集到任何可用媒体，请检查设备或授权');
+                return;
+            }
+
+            finalStream.getTracks().forEach(track => pc.addTrack(track, finalStream));
+
+            v.srcObject = finalStream;
+            try { await v.play(); } catch (_) {}
+
+            const summary = [];
+            if (finalStream.getVideoTracks().length > 0) summary.push('视频');
+            if (mixedAudioTrack) summary.push('混音音频');
+            else if (finalStream.getAudioTracks().length > 0) summary.push('音频');
+
+            setStatus(`状态: 正在推流 (${summary.join(' + ') || '未知媒体'})`);
+        }
+
+        function setupReceiver() {
+            pc.addTransceiver('audio', { direction: 'recvonly' });
+            pc.addTransceiver('video', { direction: 'recvonly' });
+
+            pc.ontrack = e => {
+                if (!v.srcObject) v.srcObject = new MediaStream();
+                v.srcObject.addTrack(e.track);
+
+                if (e.track.kind === 'audio') {
+                    unmuteBtn.style.display = 'block';
+                }
+
+                v.play().catch(() => {
+                    console.log("浏览器拦截了自动播放，等待用户点击解冻按钮");
+                });
+
+                setStatus(`状态: 正在接收 ${e.track.kind}`);
+            };
+        }
+
+        function resetUI() {
+            document.getElementById('btn').disabled = false;
+            unmuteBtn.style.display = 'none';
+        }
+
+        toggleUI();
+    </script>
+</body>
+</html>
