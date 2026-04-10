@@ -17,8 +17,6 @@
       --muted: #94a3b8;
       --primary: #3b82f6;
       --primary-2: #2563eb;
-      --success: #10b981;
-      --danger: #ef4444;
       --shadow: 0 20px 40px rgba(0,0,0,.25);
     }
     * { box-sizing: border-box; }
@@ -32,57 +30,7 @@
     .app {
       height: 100%;
       display: grid;
-      grid-template-rows: auto auto 1fr;
-    }
-    .topbar {
-      padding: 18px 22px 12px;
-      border-bottom: 1px solid rgba(148,163,184,.18);
-      background: rgba(15,23,42,.88);
-      backdrop-filter: blur(10px);
-    }
-    .title-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      flex-wrap: wrap;
-    }
-    .title-wrap h1 {
-      margin: 0;
-      font-size: 22px;
-      line-height: 1.2;
-      font-weight: 700;
-    }
-    .title-wrap p {
-      margin: 6px 0 0;
-      color: var(--muted);
-      font-size: 13px;
-    }
-    .engine-status {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 14px;
-      border-radius: 999px;
-      background: rgba(30,41,59,.88);
-      border: 1px solid rgba(148,163,184,.18);
-      font-size: 13px;
-      box-shadow: var(--shadow);
-    }
-    .dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #f59e0b;
-      box-shadow: 0 0 0 4px rgba(245,158,11,.16);
-    }
-    .dot.ready {
-      background: var(--success);
-      box-shadow: 0 0 0 4px rgba(16,185,129,.16);
-    }
-    .dot.error {
-      background: var(--danger);
-      box-shadow: 0 0 0 4px rgba(239,68,68,.16);
+      grid-template-rows: auto 1fr;
     }
     .tabs {
       display: flex;
@@ -129,14 +77,8 @@
       border: 0;
       background: #fff;
     }
-    .hint {
-      margin-left: auto;
-      color: var(--muted);
-      font-size: 12px;
-    }
     @media (max-width: 900px) {
-      .title-wrap h1 { font-size: 18px; }
-      .topbar, .tabs, .main { padding-left: 12px; padding-right: 12px; }
+      .tabs, .main { padding-left: 12px; padding-right: 12px; }
       .main { padding-top: 12px; padding-bottom: 12px; }
       .frame-wrap { border-radius: 14px; }
     }
@@ -144,19 +86,6 @@
 </head>
 <body>
   <div class="app">
-    <div class="topbar">
-      <div class="title-row">
-        <div class="title-wrap">
-          <h1>在线音视频工具箱</h1>
-          <p>by TamXie</p>
-        </div>
-        <div class="engine-status">
-          <span id="engineDot" class="dot"></span>
-          <span id="engineText">正在初始化 wasm 引擎...</span>
-        </div>
-      </div>
-    </div>
-
     <div class="tabs" id="tabs"></div>
 
     <div class="main">
@@ -168,20 +97,17 @@
 
   <script>
     const tools = [
-      { key: 'convert', label: '在线视频裁剪压缩', page: './convert.html' },
-      { key: 'merge', label: '视频合并与截取', page: './merge.html' },
-      { key: 'mixav', label: '音视频合并/替换', page: './mixav.html' },
-      { key: 'audio', label: '提取音频', page: './audio.html' },
-      { key: 'screen', label: '屏幕录制', page: './screen.html' },
-      { key: 'camera', label: '摄像头录制', page: './camera.html' },
-      { key: 'rep', label: '文件修复', page: './rep.html' },
+      { key: 'convert', label: '裁剪压缩', page: './convert.html' },
+      { key: 'merge', label: '合并截取', page: './merge.html' },
+      { key: 'mixav', label: '音视频合并替换', page: './mixav.html' },
+      { key: 'audio', label: '音频提取', page: './audio.html' },
+      { key: 'record', label: '录制', page: './record.html' },
+      { key: 'rep',    label: '修复', page: './rep.html' },
       { key: 'webrtc', label: 'Webrtc', page: './webrtc.html' }
     ];
 
     const tabsEl = document.getElementById('tabs');
     const frameEl = document.getElementById('toolFrame');
-    const engineDot = document.getElementById('engineDot');
-    const engineText = document.getElementById('engineText');
 
     const ffmpegConfig = {
       corePath: new URL('./lib/ffmpeg-core.js', document.location).href,
@@ -192,25 +118,20 @@
 
     async function initSharedEngine() {
       try {
-        engineText.textContent = '页面正在加载...';
         await window.SharedFFmpeg.load(ffmpegConfig);
-        engineDot.classList.remove('error');
-        engineDot.classList.add('ready');
-        engineText.textContent = '页面已就绪';
       } catch (err) {
-        engineDot.classList.remove('ready');
-        engineDot.classList.add('error');
-        engineText.textContent = 'Wasm 初始化失败：' + (err?.message || err);
-        console.error(err);
+        console.error('Wasm 初始化失败：', err);
       }
     }
 
     function setActiveTab(key) {
       const item = tools.find(t => t.key === key) || tools[0];
       history.replaceState(null, '', '#'+item.key);
+
       Array.from(tabsEl.querySelectorAll('.tab-btn')).forEach(btn => {
         btn.classList.toggle('active', btn.dataset.key === item.key);
       });
+
       if (frameEl.getAttribute('src') !== item.page) {
         frameEl.src = item.page;
       }
@@ -220,6 +141,7 @@
       tabsEl.innerHTML = tools.map(item =>
         `<button class="tab-btn" data-key="${item.key}" type="button">${item.label}</button>`
       ).join('');
+
       tabsEl.addEventListener('click', (e) => {
         const btn = e.target.closest('.tab-btn');
         if (!btn) return;
