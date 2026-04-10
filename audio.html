@@ -85,8 +85,8 @@
     };
 
     function addLog(msg) {
-        el.log.innerText += `\n[${new Date().toLocaleTimeString()}] ${msg}`;
-        el.log.scrollTop = el.log.scrollHeight;
+        const text = `[audio] ${msg}`;
+        console.log(text);
     }
 
     // 初始化
