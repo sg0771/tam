@@ -7,40 +7,105 @@
     <title>音视频合并/替换工具</title>
     <style>
         body { font-family: system-ui, sans-serif; background: #f1f5f9; padding: 20px; display: flex; justify-content: center; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); width: 100%; max-width: 600px; }
+        .card { background: white; padding: 5px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
+            width: 100%; max-width: 600px; }
         h2 { margin: 0 0 20px 0; color: #0f172a; font-size: 1.25rem; text-align: center; }
         .file-section { display: flex; flex-direction: column; gap: 15px; margin-bottom: 25px; }
-        .file-input { border: 2px dashed #cbd5e1; padding: 15px; border-radius: 8px; text-align: center; position: relative; }
+        .file-box { border: 2px dashed #007bff; padding: 5px; text-align: center; margin: 15px 0; cursor: pointer; }
+
+        .file-input { border: 2px dashed #cbd5e1; padding: 5px; border-radius: 8px; text-align: center; position: relative; }
         .file-input:hover { border-color: #3b82f6; background: #f8fafc; }
         label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px; color: #475569; text-align: left; }
-        #log { background: #1e293b; color: #38bdf8; padding: 12px; height: 180px; overflow-y: auto; font-family: monospace; font-size: 11px; border-radius: 6px; margin-top: 20px; white-space: pre-wrap; }
-        .btn-merge { width: 100%; padding: 14px; background: #2563eb; color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 16px; }
-        .btn-merge:disabled { background: #94a3b8; cursor: not-allowed; }
+        #log { background: #1e293b; color: #38bdf8; padding: 5px; height: 180px; overflow-y: auto; font-family: monospace; font-size: 11px; border-radius: 6px; margin-top: 20px; white-space: pre-wrap; }
+ 
         .tip { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+        .btn-stack {   display: flex;width: 100%; gap: 8px;  }
+        .action-btn {   flex: 1;   padding: 10px;  border: none;
+             border-radius: 8px; font-size: 13px; 
+              font-weight: 600; cursor: pointer; color: white; box-sizing: border-box;  }
+        #getVideoBtn { background: #ff9500; } 
+        #getAudioBtn { background: #6f42c1; }
+        #mergeBtn    { background: #28a745; }
+        #mergeBtn2    { background: #280045; }
+        #xwsBtn      { background: #820045; }
+        #audioBtn    { background: #820045; }
+
+        .action-btn:disabled { background: #ccc !important; cursor: not-allowed; }
+        
+        .setting-group { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .setting-item { display: flex; flex-direction: column; gap: 6px; }
+        
+        .bitrate-info { display: flex; justify-content: space-between; align-items: center; }
+        select, input[type="range"] { padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; }
     </style>
 </head>
 <body>
 
 <div class="card">
+
     <div class="file-section">
-        <div>
-            <label>1. 选择视频文件 (MP4/MKV等)</label>
-            <div class="file-input">
-                <input type="file" id="videoInput" accept="video/*">
-                <div class="tip" id="vName">未选择视频</div>
-            </div>
+        <div class="file-box" onclick="document.getElementById('videoInput').click()">
+            <input type="file" id="videoInput" style="display: none">
+            <span id="videoLabel"> 选择视频文件 (MP4/MKV等)</span>
+        </div>  
+            <div class="setting-group">
+        <div class="setting-item">
+            <select id="formatSelect">
+                <option value="mp3">MP3</option>
+                <option value="aac">AAC (.m4a)</option>
+                <option value="wav">WAV (无损)</option>
+            </select>
         </div>
-        
-        <div>
-            <label>2. 选择音频文件 (MP3/WAV/AAC等)</label>
-            <div class="file-input">
-                <input type="file" id="audioInput" accept="audio/*">
-                <div class="tip" id="aName">未选择音频</div>
+        <div class="setting-item">
+            <select id="sampleRateSelect">
+                <option value="44100">44100 Hz</option>
+                <option value="48000">48000 Hz</option>
+                <option value="16000">16000 Hz (语音)</option>
+            </select>
+        </div>
+        <div class="setting-item">
+            <select id="channelSelect">
+                <option value="2">立体声 (2.0)</option>
+                <option value="1">单声道 (1.0)</option>
+            </select>
+        </div>
+        <div class="setting-item" id="bitrateBox">
+            <div class="bitrate-info">
+                <label>码率</label>
+                <span id="bitrateVal" style="font-size: 12px; color: #0ea5e9;">128 kbps</span>
             </div>
+            <input type="range" id="bitrateRange" min="64" max="192" step="32" value="128">
+        </div>
+    </div>   
+        <div class="btn-stack">
+            <button id="getVideoBtn" class="action-btn" disabled>正在初始化引擎...</button>
+            <button id="getAudioBtn" class="action-btn" disabled>正在初始化引擎...</button>
+            <button id="audioBtn"    class="action-btn" disabled>正在初始化引擎...</button>
         </div>
     </div>
 
-    <button id="mergeBtn" class="btn-merge" disabled>正在初始化引擎...</button>
+    <div class="file-section">
+        <div class="file-box" onclick="document.getElementById('audioInput').click()">
+            <input type="file" id="audioInput" style="display: none">
+            <span id="audioLabel">选择音频文件 (MP3/WAV/AAC等)</span>
+        </div>     
+        
+        <div class="btn-stack">
+            <button id="mergeBtn" class="action-btn" disabled>正在初始化引擎...</button>
+            <button id="mergeBtn2" class="action-btn" disabled>正在初始化引擎...</button>
+        </div>
+    </div>
+
+
+    <div class="file-section">
+        <div class="file-box" onclick="document.getElementById('xwsInput').click()">
+            <input type="file" id="xwsInput" style="display: none">
+            <span id="xwsLabel">选择XWS/WXM/FLV文件</span>
+        </div>      
+        <div class="btn-stack"> 
+            <button id="xwsBtn" class="action-btn"  disabled>正在初始化引擎...</button>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -49,12 +114,53 @@
         document.body.innerHTML = '<div style="padding:24px;font-family:sans-serif">请从 index.html 打开此页面。</div>';
         throw new Error('请从 index.html 进入此页面');
     }
-    const { fetchFile } = ffmpegHost.FFmpeg;
-    const ffmpeg = ffmpegHost.SharedFFmpeg.getOrCreate(ffmpegHost.__sharedFFmpegConfig);
 
-    const vInput = document.getElementById('videoInput');
-    const aInput = document.getElementById('audioInput');
-    const mergeBtn = document.getElementById('mergeBtn');
+    const ffmpeg = ffmpegHost.SharedFFmpeg.getOrCreate(ffmpegHost.__sharedFFmpegConfig);
+    const el = {
+        vInput :document.getElementById('videoInput'),
+        vLabel :document.getElementById('videoLabel'),
+        getVideoBtn: document.getElementById('getVideoBtn'),
+        getAudioBtn : document.getElementById('getAudioBtn'),
+        
+        audioBtn : document.getElementById('audioBtn'),
+
+        aInput : document.getElementById('audioInput'),
+        aLabel :document.getElementById('audioLabel'),
+
+        mergeBtn: document.getElementById('mergeBtn'),
+        mergeBtn2: document.getElementById('mergeBtn2'),
+        xwsInput : document.getElementById('xwsInput'),
+        xwsLabel : document.getElementById('xwsLabel'),
+        xwsBtn: document.getElementById('xwsBtn'),
+
+        format: document.getElementById('formatSelect'),
+        bitrateBox: document.getElementById('bitrateBox'),
+        bitrateRange: document.getElementById('bitrateRange'),
+        bitrateVal: document.getElementById('bitrateVal'),
+        sampleRate: document.getElementById('sampleRateSelect'),
+        channels: document.getElementById('channelSelect'),
+    }
+
+    // UI 交互
+    el.format.onchange = () => {
+        el.bitrateBox.style.visibility = el.format.value === 'wav' ? 'hidden' : 'visible';
+    };
+    el.bitrateRange.oninput = () => {
+        el.bitrateVal.innerText = el.bitrateRange.value + " kbps";
+    };
+
+    el.vInput.onchange = (e) => {
+        if (e.target.files[0]) 
+            el.vLabel.innerText = e.target.files[0].name;
+    };
+    el.aInput.onchange = (e) => {
+        if (e.target.files[0]) 
+            el.aLabel.innerText = e.target.files[0].name;
+    };
+    el.xwsInput.onchange = (e) => {
+        if (e.target.files[0]) 
+           el.xwsLabel.innerText = e.target.files[0].name;
+    };
 
     function addLog(msg) {
         console.log('[mixav]', msg);
@@ -64,25 +170,212 @@
     (async () => {
         try {
             await ffmpegHost.SharedFFmpeg.load(ffmpegHost.__sharedFFmpegConfig);
-            mergeBtn.innerText = "立即合并并下载";
-            mergeBtn.disabled = false;
+            el.getVideoBtn.innerText = "无损提取视频";
+            el.getVideoBtn.disabled = false;
+
+            el.getAudioBtn.innerText = "无损提取音频";
+            el.getAudioBtn.disabled = false;
+
+            el.audioBtn.innerText = "按参数提取音频";
+            el.audioBtn.disabled = false;
+
+            el.mergeBtn.innerText = "合并音视频";
+            el.mergeBtn.disabled = false;
+
+            el.mergeBtn2.innerText = "无损合并音视频";
+            el.mergeBtn2.disabled = false;
+
+            el.xwsBtn.innerText = "修复录屏视频文件";
+            el.xwsBtn.disabled = false;
             addLog("页面引擎就绪。");
         } catch (e) {
-            addLog("错误: 无法加载wasm核心文件，请检查 ./lib 目录。");
+            addLog("错误: 无法加载wasm核心文件");
         }
     })();
 
-    // 监听文件选择显示名称
-    vInput.onchange = () => document.getElementById('vName').innerText = vInput.files[0]?.name || "未选择视频";
-    aInput.onchange = () => document.getElementById('aName').innerText = aInput.files[0]?.name || "未选择音频";
 
-    mergeBtn.onclick = async () => {
-        const vFile = vInput.files[0];
-        const aFile = aInput.files[0];
+    //按指定参数提取音频
+    el.audioBtn.onclick = async () => {
+        const file = el.vInput.files[0];
+        if (!file) 
+            return alert("请确保视频已选择！");
+
+        addLog("要处理的视频为..."+file.name);
+
+        el.audioBtn.disabled = true;
+        addLog(`正在处理: ${file.name}`);
+
+        const inputData = new Uint8Array(await file.arrayBuffer());
+        const format = el.format.value;
+        
+        // --- 保持原文件名的逻辑 ---
+        // 使用正则去掉最后一个点及其后面的后缀
+        const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+        const outExt = format === 'aac' ? 'm4a' : format;
+        const outputFileName = `${baseName}.${outExt}`;
+        // -----------------------
+
+        const inputTmp = "in_file";
+        const outputTmp = `out_file.${outExt}`;
+
+        const args = ['-i', inputTmp, '-vn', '-ar', el.sampleRate.value, '-ac', el.channels.value];
+
+        if (format === 'wav') {
+            args.push('-f', 'wav');
+        } else {
+            args.push('-b:a', `${el.bitrateRange.value}k`);
+            args.push('-acodec', format === 'mp3' ? 'libmp3lame' : 'aac');
+        }
+        args.push(outputTmp);
+
+        try {
+            ffmpeg.FS('writeFile', inputTmp, inputData);
+            addLog(" 开始提取音频...");
+            
+            await ffmpeg.run(...args);
+
+            const outData = ffmpeg.FS('readFile', outputTmp);
+            const blobType = format === 'wav' ? 'audio/wav' : (format === 'mp3' ? 'audio/mpeg' : 'audio/mp4');
+            const url = URL.createObjectURL(new Blob([outData.buffer], { type: blobType }));
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = outputFileName; // 这里应用了保持原名后的新文件名
+            a.click();
+
+            addLog(`成功！已保存为: ${outputFileName}`);
+            
+            // 清理 VFS 内存
+            ffmpeg.FS('unlink', inputTmp);
+            ffmpeg.FS('unlink', outputTmp);
+        } catch (err) {
+            addLog(`失败: ${err.message}`);
+        } finally {
+            el.audioBtn.disabled = false;
+        }
+    };
+
+    el.getVideoBtn.onclick = async () => {
+        const vFile = el.vInput.files[0];
+        if (!vFile) 
+            return alert("请确保视频已选择！");
+
+        addLog("要处理的视频为..."+vFile.name);
+        el.getVideoBtn.disabled = true;
+        addLog("开始读取文件并准备提取视频...");
+
+        try {
+            // 1. 准备文件名和数据
+            const vExt = vFile.name.split('.').pop();
+            addLog("vExt..." + vExt);
+            const vTmp = `in_video.${vExt}`;
+            addLog("vTmp..." + vTmp);
+
+            // 保持原视频文件名为输出名，并确保后缀是 .mp4
+            const baseName = vFile.name.substring(0, vFile.name.lastIndexOf('.')) || "output";
+            addLog("baseName..." + baseName);
+            const outName = baseName + '.video.' + vExt;
+            addLog("outName..." + outName);
+
+            // 2. 写入虚拟文件系统
+            const inputVideoData = new Uint8Array(await vFile.arrayBuffer());
+            ffmpeg.FS('writeFile', vTmp, inputVideoData);
+
+            addLog("正在提取视频 ...");
+
+            await ffmpeg.run(  '-i', vTmp, '-an', '-c:v', 'copy',  outName  );
+
+            addLog("处理完毕，准备下载...");
+
+            // 3. 读取结果
+            const data = ffmpeg.FS('readFile', outName);
+            const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
+
+            // 4. 触发下载
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = outName;
+            a.click();
+
+            addLog(`✨ 成功！文件已保存为: ${outName}`);
+
+            // 5. 清理
+            ffmpeg.FS('unlink', vTmp);
+            ffmpeg.FS('unlink', outName);
+
+        } catch (err) {
+            addLog(`❌ 出错: ${err.message}`);
+            console.error(err);
+        } finally {
+            el.getVideoBtn.disabled = false;
+        }
+    };
+
+    el.getAudioBtn.onclick = async () => {
+        const vFile = el.vInput.files[0];
+        if (!vFile) 
+            return alert("请确保视频已选择！");
+
+        addLog("要处理的视频为..."+vFile.name);
+        el.getAudioBtn.disabled = true;
+        addLog("开始读取文件并准备提取音频...");
+
+        try {
+            // 1. 准备文件名和数据
+            const vExt = vFile.name.split('.').pop();
+            addLog("vExt..." + vExt);
+            const vTmp = `in_video.${vExt}`;
+            addLog("vTmp..." + vTmp);
+
+            // 保持原视频文件名为输出名，并确保后缀是 .mp4
+            const baseName = vFile.name.substring(0, vFile.name.lastIndexOf('.')) || "output";
+            addLog("baseName..." + baseName);
+            const outName = baseName + '.audio.' + vExt;
+            addLog("outName..." + outName);
+
+            // 2. 写入虚拟文件系统
+            const inputVideoData = new Uint8Array(await vFile.arrayBuffer());
+            ffmpeg.FS('writeFile', vTmp, inputVideoData);
+
+            addLog("正在提取音频 ...");
+
+            await ffmpeg.run(  '-i', vTmp, '-vn', '-c:v', 'copy',  outName  );
+
+            addLog("处理完毕，准备下载...");
+
+            // 3. 读取结果
+            const data = ffmpeg.FS('readFile', outName);
+            const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
+
+            // 4. 触发下载
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = outName;
+            a.click();
+
+            addLog(`✨ 成功！文件已保存为: ${outName}`);
+
+            // 5. 清理
+            ffmpeg.FS('unlink', vTmp);
+            ffmpeg.FS('unlink', outName);
+
+        } catch (err) {
+            addLog(`❌ 出错: ${err.message}`);
+            console.error(err);
+        } finally {
+            el.getAudioBtn.disabled = false;
+        }
+    };
+
+    //将音频转为AAC合并到视频
+    el.mergeBtn.onclick = async () => {
+
+        const vFile = el.vInput.files[0];
+        const aFile = el.aInput.files[0];
 
         if (!vFile || !aFile) return alert("请确保视频和音频文件都已选择！");
 
-        mergeBtn.disabled = true;
+        el.mergeBtn.disabled = true;
         addLog("开始读取文件并准备合并...");
 
         try {
@@ -97,8 +390,10 @@
             const outName = `${baseName}_merged.mp4`;
 
             // 2. 写入虚拟文件系统
-            ffmpeg.FS('writeFile', vTmp, await fetchFile(vFile));
-            ffmpeg.FS('writeFile', aTmp, await fetchFile(aFile));
+            const inputVideoData = new Uint8Array(await vFile.arrayBuffer());
+            ffmpeg.FS('writeFile', vTmp, inputVideoData);
+            const inputAudioData = new Uint8Array(await vFile.arrayBuffer());
+            ffmpeg.FS('writeFile', aTmp, inputAudioData);
 
             addLog("正在合并流 (视频复制 + 音频转码)...");
 
@@ -145,9 +440,126 @@
             addLog(`❌ 出错: ${err.message}`);
             console.error(err);
         } finally {
+            el.mergeBtn.disabled = false;
+        }
+    };
+
+    //无损合并音视频流，快速
+    el.mergeBtn2.onclick = async () => {
+        const vFile = el.vInput.files[0];
+        const aFile = el.aInput.files[0];
+
+        if (!vFile || !aFile) return alert("请确保视频和音频文件都已选择！");
+
+        el.mergeBtn2.disabled = true;
+        addLog("开始读取文件并准备合并...");
+
+        try {
+            // 1. 准备文件名和数据
+            const vExt = vFile.name.split('.').pop();
+            const aExt = aFile.name.split('.').pop();
+            const vTmp = `in_video.${vExt}`;
+            const aTmp = `in_audio.${aExt}`;
+            
+            // 保持原视频文件名为输出名，并确保后缀是 .mp4
+            const baseName = vFile.name.substring(0, vFile.name.lastIndexOf('.')) || "output";
+            const outName = baseName + ".merge." + vExt;
+
+            // 2. 写入虚拟文件系统
+            const inputVideoData = new Uint8Array(await vFile.arrayBuffer());
+            ffmpeg.FS('writeFile', vTmp, inputVideoData);
+            const inputAudioData = new Uint8Array(await vFile.arrayBuffer());
+            ffmpeg.FS('writeFile', aTmp, inputAudioData);
+
+            addLog("正在无损合并流 (视频复制 + 音频转码)...");
+
+            await ffmpeg.run(
+                '-i', vTmp, 
+                '-i', aTmp, 
+                '-map', '0:v:0', 
+                '-map', '1:a:0', 
+                '-c:v', 'copy', 
+                '-c:a', 'copy', 
+                '-shortest', 
+                outName
+            );
+
+            addLog("合并完成，准备下载...");
+
+            // 3. 读取结果
+            const data = ffmpeg.FS('readFile', outName);
+            const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
+
+            // 4. 触发下载
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = outName;
+            a.click();
+
+            addLog(`✨ 成功！文件已保存为: ${outName}`);
+
+            // 5. 清理
+            ffmpeg.FS('unlink', vTmp);
+            ffmpeg.FS('unlink', aTmp);
+            ffmpeg.FS('unlink', outName);
+
+        } catch (err) {
+            addLog(`❌ 出错: ${err.message}`);
+            console.error(err);
+        } finally {
             mergeBtn.disabled = false;
         }
     };
+
+    el.xwsBtn.onclick = async () => {
+        const file = el.xwsInput.files[0];
+        if (!file)
+            return alert("请选择要修复的文件！");
+
+        el.xwsBtn.disabled = true;
+        doLog("读取XWS文件数据...");
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const data = new Uint8Array(arrayBuffer);
+
+            //  修复逻辑
+            if (data[0] === 0x77) {
+                doLog("检测到 0x88 开头，修正同步字节...");
+                for (let i = 0; i < data.length; i += 188) {
+                    if (data[i] === 0x77) data[i] = 0x47;
+                }
+            } else {
+                doLog("首字节非 0x88，直接转换...");
+            }
+
+            const inputName = 'input.ts';
+            const outputName = file.name.replace('.xws', '') || 'output.mp4';
+
+            // 写入  虚拟文件系统
+            ffmpeg.FS('writeFile', inputName, data);
+
+            doLog("执行 copy 命令...");
+            await ffmpeg.run('-i', inputName, '-c', 'copy', outputName);
+
+            const outData = ffmpeg.FS('readFile', outputName);
+            const url = URL.createObjectURL(new Blob([outData.buffer], { type: 'video/mp4' }));
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = outputName;
+            a.click();
+            
+            doLog("转换成功并下载。");
+            el.startBtn.disabled = false;
+        
+        } catch (err) {
+            addLog(`❌ 出错: ${err.message}`);
+            console.error(err);
+        } finally {
+            el.xwsBtn.disabled = false;
+        }
+    };
+
 </script>
 </body>
 </html>

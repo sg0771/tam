@@ -36,7 +36,7 @@
       display: flex;
       gap: 10px;
       overflow-x: auto;
-      padding: 12px 22px 14px;
+      padding: 5px 5px 5px;
       background: rgba(2,6,23,.5);
       border-bottom: 1px solid rgba(148,163,184,.12);
     }
@@ -97,13 +97,11 @@
 
   <script>
     const tools = [
-      { key: 'convert', label: '裁剪压缩', page: './convert.html' },
-      { key: 'merge', label: '合并截取', page: './merge.html' },
-      { key: 'mixav', label: '音视频合并替换', page: './mixav.html' },
-      { key: 'audio', label: '音频提取', page: './audio.html' },
-      { key: 'record', label: '录制', page: './record.html' },
-      { key: 'rep',    label: '修复', page: './rep.html' },
-      { key: 'webrtc', label: 'Webrtc', page: './webrtc.html' }
+      { key: 'convert', label: '视频裁剪压缩', page: './convert.html' },
+      { key: 'merge', label: '视频合并截取', page: './merge.html' },
+      { key: 'mixav', label: '音视频合并替换修复', page: './mixav.html' },
+      { key: 'record', label: '录制屏幕/摄像头', page: './record.html' },
+      { key: 'webrtc', label: 'Webrtc测试', page: './webrtc.html' }
     ];
 
     const tabsEl = document.getElementById('tabs');
