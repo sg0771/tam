@@ -59,7 +59,7 @@
             border: 2px solid #ddd;
             width: 100%;
             max-width: 820px;
-            max-height: 420px;
+            max-height: 360px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -102,7 +102,6 @@
         #btn-stop { background: var(--success); }
 
         .tips { margin-top: 10px; font-size: 12px; color: #0050b3; }
-        #status-msg { text-align: center; margin-top: 10px; font-size: 13px; color: #666; min-height: 1.5em; }
 
         @media (max-width: 900px) {
             .mode-row, .config-grid { grid-template-columns: 1fr 1fr; }
@@ -112,11 +111,8 @@
 </head>
 <body>
 <div class="card">
-    <h2>录制中心</h2>
-
     <div class="mode-row">
         <div class="field">
-            <label>录制模式</label>
             <select id="record-mode">
                 <option value="screen" selected>屏幕录制</option>
                 <option value="camera">摄像头录制</option>
@@ -182,7 +178,6 @@
     </div>
 
     <div class="tips" id="source-info">💡 屏幕录制请勾选“分享系统音频”；摄像头录制可使用采集参数自动匹配。</div>
-    <div id="status-msg">等待 wasm 核心加载...</div>
 </div>
 
 <script type="module">
@@ -204,7 +199,6 @@ const el = {
     capsHint: document.getElementById('caps-hint'),
     preview: document.getElementById('preview'),
     sourceInfo: document.getElementById('source-info'),
-    status: document.getElementById('status-msg'),
     btnPreview: document.getElementById('btn-preview'),
     btnStart: document.getElementById('btn-start'),
     btnStop: document.getElementById('btn-stop'),
@@ -226,9 +220,8 @@ let writableFileStream = null;
     try {
         await ffmpegHost.SharedFFmpeg.load(ffmpegHost.__sharedFFmpegConfig);
         await loadCameraDevices();
-        el.status.innerText = '✅ wasm 引擎已就绪';
     } catch (e) {
-        el.status.innerText = '❌ 引擎初始化失败';
+        alert('引擎初始化失败: ' + err.message);
     }
 })();
 
