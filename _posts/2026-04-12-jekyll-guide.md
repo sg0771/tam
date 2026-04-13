@@ -1,6 +1,6 @@
 ---
-title: 我的第一篇中文笔记
-author: 你的名字
+title: 第一篇中文笔记
+author: TamXie
 date: 2026-04-12 14:00:00 +0800
 categories: [技术, 教程]
 tags: [Jekyll, 中文]
