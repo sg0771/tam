@@ -231,3 +231,7 @@ jekyll-archives:
   permalinks:
     tag: /tags/:name/
     category: /categories/:name/
+
+
+html_proofer:
+  enforce_https: false
