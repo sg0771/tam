@@ -1,3 +1,9 @@
+---
+layout: post
+title: "WebRTC 传输安全机制第二话：深入显出 SRTP 协议"
+render_with_liquid: false
+---
+
 # WebRTC 传输安全机制第二话：深入显出 SRTP 协议
 
 通过 DTLS 协商后，RTC 通信的双方完成 MasterKey 和 MasterSalt 的协商。接下来，我们继续分析在 WebRTC 中，如何使用交换的密钥，来对 RTP 和 RTCP 进行加密，实现数据的安全传输。同时，本文会对 libsrtp 使用中，遇到的问题的进行解答，例如，什么是 ROC，ROC 为什么是 32-bits？为什么会返回 error_code=9, error_code=10？交换的密钥有生命周期吗，如果有是多长时间呢？阅读本篇之前建议阅读 DTLS 协商篇，两者结合，效果更佳哦！
