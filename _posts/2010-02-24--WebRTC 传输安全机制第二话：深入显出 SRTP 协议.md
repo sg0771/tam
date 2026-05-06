@@ -79,7 +79,7 @@ Session Key 的导出依赖于如下参数：
 * master_key: DTLS 完成后，协商得到的 Key。
 * master_salt:  DTLS 完成后，协商得到的 Salt。
 * packet_index:  RTP/RTCP 的包序号。SRTP 使用 48-bits 的隐式包需要，SRTCP 使用 31-bits 包序号。参考序号管理。
-* key_derivation_rate: key 导出速率 , 记为 kdr。默认取值为 0，执行 1 次 Key 导出。取值范围[ 1,2,4,...,2^24 ]。在 key_derivation_rate>0 的情况下，在加密之前，执行一次 key 导出，后续在 packet_index/key_derivation_rate > 0 时，执行 key 导出。
+* key_derivation_rate: key 导出速率 , 记为 kdr。默认取值为 0，执行 1 次 Key 导出。取值范围[ 1,2,4,...,2^24 ]。在 key_derivation_rate>0 的情况下，在加密之前，执行一次 key 导出，后续在 packet_index/key_derivation_rate > 0 时，执行 key 导出。  
 
 ```C++
 r = packet_index / kdr
